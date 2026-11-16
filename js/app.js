@@ -134,8 +134,11 @@
     const cam2 = savedUI.cam2d && typeof savedUI.cam2d.zoom === 'number' ? savedUI.cam2d : null;
     const initialW = canvasW(els.canvas2d);
     const initialH = canvasH(els.canvas2d);
+    const initialCam2 = cam2
+      ? cam2
+      : readableCamera(MV.Render2D.fitCamera(app.project, initialW, initialH, initialW < 700 ? 44 : 100), initialW);
     app.view2d = {
-      cam: cam2 || MV.Render2D.fitCamera(app.project, initialW, initialH, initialW < 700 ? 44 : 100),
+      cam: initialCam2,
       layers: app.layers,
       selection: null,
       hover: null,
@@ -671,6 +674,7 @@
       <p class="hint-line">能力表是门锁与道具的共享词汇。被引用的能力不能删除。</p>
       <div class="btn-row">
         <button class="btn" data-action="fit-all">适应全部</button>
+        <button class="btn" data-action="spread-layout">舒展布局</button>
         <button class="btn" data-action="focus-goal">定位终点</button>
         <button class="btn" data-action="open-presets">载入预设</button>
       </div>
@@ -830,6 +834,7 @@
     else if (action === 'focus') focusSelection();
     else if (action === 'focus-goal') { if (app.project.goalRoom) { select('room', app.project.goalRoom, true); focusRoom(app.project.goalRoom); } }
     else if (action === 'fit-all') fitAll();
+    else if (action === 'spread-layout') spreadLayout();
     else if (action === 'swap-link') swapLink();
     else if (action === 'set-current-region') { app.currentRegion = app.selection.id; renderRegionList(); persistUI(); toast('当前区域已切换'); }
     else if (action === 'focus-region') focusRegion(app.selection.id);
@@ -1228,7 +1233,8 @@
       id: MV.uid('region'),
       name: '新区域 ' + (index + 1),
       code: 'Z' + String(index + 1).padStart(2, '0'),
-      tone: index % MV.REGION_TONES.length
+      tone: index % MV.REGION_TONES.length,
+      color: MV.REGION_COLORS[index % MV.REGION_COLORS.length]
     };
     app.project.regions.push(region);
     app.currentRegion = region.id;
@@ -1237,6 +1243,30 @@
     markDirty();
     refreshAll();
     toast('区域已添加');
+  }
+
+  function spreadLayout() {
+    if (!app.project.rooms.length) return;
+    snapshot();
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    app.project.rooms.forEach(room => {
+      minX = Math.min(minX, room.x);
+      minY = Math.min(minY, room.y);
+      maxX = Math.max(maxX, room.x + room.w);
+      maxY = Math.max(maxY, room.y + room.h);
+    });
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+    app.project.rooms.forEach(room => {
+      const cx = room.x + room.w / 2;
+      const cy = room.y + room.h / 2;
+      room.x = Math.round((centerX + (cx - centerX) * 1.18 - room.w / 2) / 5) * 5;
+      room.y = Math.round((centerY + (cy - centerY) * 1.18 - room.h / 2) / 5) * 5;
+    });
+    markDirty();
+    app.analysis = MV.analyze(app.project);
+    refreshAll();
+    toast('布局已舒展（可撤销）');
   }
 
   function addItemToRoom(roomId) {
@@ -1404,7 +1434,7 @@
     hideTooltip();
     applyModeUI();
     requestAnimationFrame(() => {
-      if (mode === '2d' && !app.fitted2d) fit2D();
+      if (mode === '2d' && !app.fitted2d) fit2DReadable();
       if (mode === '3d' && !app.fitted3d) fit3D();
       scheduleRender();
       updateStatus();
@@ -1441,6 +1471,20 @@
     }
     app.view2d.cam = MV.Render2D.fitCamera(app.project, W, H, W < 700 ? 44 : 100);
     app.fitted2d = true;
+    scheduleRender();
+    updateStatusZoom();
+    persistUI();
+  }
+
+  function readableCamera(cam, W) {
+    const min = W >= 700 ? 0.42 : 0.3;
+    if (cam.zoom < min) cam.zoom = min;
+    return cam;
+  }
+
+  function fit2DReadable() {
+    fit2D();
+    app.view2d.cam = readableCamera(app.view2d.cam, canvasW(els.canvas2d));
     scheduleRender();
     updateStatusZoom();
     persistUI();
@@ -2084,7 +2128,7 @@
     MV.saveProject(app.project);
     app.view3d.center2d = MV.Render3D.mapCenter(app.project);
     if (app.mode === '2d') {
-      fit2D();
+      fit2DReadable();
       app.fitted3d = false;
     } else {
       fit3D();

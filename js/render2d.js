@@ -448,7 +448,7 @@
       const phaseT = phase === undefined ? 0 : MV.clamp(phase / maxPhase, 0, 1);
       const phaseAccent = MV.phaseColor(project, phase === undefined ? 0 : phase, maxPhase);
       const important = selected || hover || ['hub', 'boss', 'start', 'goal'].includes(room.type);
-      const detail = view.cam.zoom >= 0.44 || important;
+      const detail = view.cam.zoom >= 0.32 || important;
       const compact = detail && !important && view.cam.zoom < 0.72;
       const showItems = view.cam.zoom >= 0.72 || selected || hover;
 
@@ -518,7 +518,7 @@
         }
 
         if (view.layers.names && h > 18) {
-          ctx.font = (compact ? '9px ' : (w < 100 ? '10px ' : '11.5px ')) + FONT_UI;
+          ctx.font = (compact ? '8.5px ' : (w < 100 ? '10px ' : '11.5px ')) + FONT_UI;
           ctx.fillStyle = reachable ? (selected ? t.inkStrong : t.roomInk) : t.roomInkDim;
           const nameY = compact ? p.y + 16 : p.y + 25;
           const maxText = Math.max(20, w - pad * 2 - (w > 130 && !compact ? 12 : 0));

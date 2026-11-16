@@ -15,7 +15,26 @@
     return Object.assign({ id, name, kind: kind || 'ability', room, grants: grants || '', keyCount: 1, optional: false }, extra || {});
   }
   function A(id, name) { return { id, name }; }
+  function spreadRooms(rooms, factor) {
+    if (!rooms || rooms.length < 2) return;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    rooms.forEach(room => {
+      minX = Math.min(minX, room.x);
+      minY = Math.min(minY, room.y);
+      maxX = Math.max(maxX, room.x + room.w);
+      maxY = Math.max(maxY, room.y + room.h);
+    });
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+    rooms.forEach(room => {
+      const roomX = room.x + room.w / 2;
+      const roomY = room.y + room.h / 2;
+      room.x = Math.round((centerX + (roomX - centerX) * factor - room.w / 2) / 5) * 5;
+      room.y = Math.round((centerY + (roomY - centerY) * factor - room.h / 2) / 5) * 5;
+    });
+  }
   function build(spec) {
+    spreadRooms(spec.rooms, spec.spread || 1.35);
     return MV.normalizeProject({
       schema: 'routeforge/1',
       meta: Object.assign({ created: Date.now(), updated: Date.now() }, spec.meta),
