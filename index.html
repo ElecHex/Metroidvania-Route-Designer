@@ -113,8 +113,11 @@
 
       <section class="panel-block region-block">
         <div class="panel-heading">
-          <span>区域</span>
-          <button id="addRegionBtn" class="mini-btn" title="新增区域">+</button>
+          <span>区域 <span id="regionSummary" class="heading-hint"></span></span>
+          <div class="heading-actions">
+            <button id="showAllRegionsBtn" class="mini-text-btn" title="显示全部区域">全部</button>
+            <button id="addRegionBtn" class="mini-btn" title="新增区域">+</button>
+          </div>
         </div>
         <div id="regionList" class="region-list"></div>
       </section>

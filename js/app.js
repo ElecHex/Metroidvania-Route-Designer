@@ -21,6 +21,8 @@
     toolList: $('toolList'),
     itemKindSeg: $('itemKindSeg'),
     addRegionBtn: $('addRegionBtn'),
+    showAllRegionsBtn: $('showAllRegionsBtn'),
+    regionSummary: $('regionSummary'),
     regionList: $('regionList'),
     layerList: $('layerList'),
     exportPngBtn: $('exportPngBtn'),
@@ -51,6 +53,7 @@
     mode: '2d',
     theme: 'dark',
     colorMode: 'color',
+    hiddenRegions: new Set(),
     itemKind: 'ability',
     currentRegion: null,
     rightTab: 'inspect',
@@ -85,6 +88,7 @@
       itemKind: app.itemKind,
       rightTab: app.rightTab,
       layers: app.layers,
+      hiddenRegions: Array.from(app.hiddenRegions),
       currentRegion: app.currentRegion,
       cam2d: app.view2d ? app.view2d.cam : null,
       cam3d: app.view3d ? app.view3d.cam : null
@@ -128,6 +132,9 @@
     }
     app.project = MV.normalizeProject(project);
     app.lastSaved = loadedFromStorage ? (app.project.meta.updated || 0) : 0;
+    if (Array.isArray(savedUI.hiddenRegions)) {
+      app.hiddenRegions = new Set(savedUI.hiddenRegions.filter(id => app.project.regions.some(region => region.id === id)));
+    }
     app.currentRegion = (app.project.regions.find(r => r.id === savedUI.currentRegion) || app.project.regions[0]).id;
     app.analysis = MV.analyze(app.project);
 
@@ -229,7 +236,9 @@
       persistUI();
     });
     els.addRegionBtn.addEventListener('click', addRegion);
+    els.showAllRegionsBtn.addEventListener('click', showAllRegions);
     els.regionList.addEventListener('click', e => {
+      if (e.target.closest('[data-region-visible]')) { e.stopPropagation(); return; }
       const focusBtn = e.target.closest('[data-focus-region]');
       if (focusBtn) {
         e.stopPropagation();
@@ -238,6 +247,10 @@
       }
       const row = e.target.closest('[data-region]');
       if (row) selectRegion(row.dataset.region);
+    });
+    els.regionList.addEventListener('change', e => {
+      const checkbox = e.target.closest('[data-region-visible]');
+      if (checkbox) toggleRegionVisibility(checkbox.dataset.regionVisible, checkbox.checked);
     });
     els.layerList.addEventListener('change', e => {
       const input = e.target.closest('[data-layer]');
@@ -328,15 +341,30 @@
     app.view3d.colorMode = app.colorMode;
   }
 
+  function visibleProject() {
+    if (!app.hiddenRegions.size) return app.project;
+    const regions = app.project.regions.filter(region => !app.hiddenRegions.has(region.id));
+    const regionIds = new Set(regions.map(region => region.id));
+    const rooms = app.project.rooms.filter(room => regionIds.has(room.region));
+    const roomIds = new Set(rooms.map(room => room.id));
+    return Object.assign({}, app.project, {
+      regions,
+      rooms,
+      links: app.project.links.filter(link => roomIds.has(link.a) && roomIds.has(link.b)),
+      items: app.project.items.filter(item => roomIds.has(item.room))
+    });
+  }
+
   function scheduleRender() {
     if (app.raf) return;
     app.raf = requestAnimationFrame(() => {
       app.raf = 0;
       syncViews();
+      const project = visibleProject();
       if (app.mode === '2d') {
-        MV.Render2D.draw(els.canvas2d, app.project, app.view2d);
+        MV.Render2D.draw(els.canvas2d, project, app.view2d);
       } else {
-        MV.Render3D.draw(els.canvas3d, app.project, app.view3d);
+        MV.Render3D.draw(els.canvas3d, project, app.view3d);
       }
       updateStatusZoom();
     });
@@ -374,8 +402,10 @@
 
   function updateStatus() {
     const counts = MV.projectCounts(app.project);
+    const visibleRegions = counts.regions - app.hiddenRegions.size;
     els.statusMode.textContent = app.mode === '2d' ? '2D ROUTE' : '3D MASSING';
-    els.statusCounts.textContent = counts.regions + ' regions / ' + counts.rooms + ' rooms / ' + counts.links + ' links / ' + counts.items + ' items';
+    els.statusCounts.textContent = counts.regions + ' regions / ' + counts.rooms + ' rooms / ' + counts.links + ' links / ' + counts.items + ' items' +
+      (app.hiddenRegions.size ? ' · ' + visibleRegions + '/' + counts.regions + ' regions visible' : '');
     if (app.analysis) {
       const errors = app.analysis.warnings.filter(w => w.level === 'error').length;
       const warns = app.analysis.warnings.filter(w => w.level === 'warn').length;
@@ -403,10 +433,14 @@
     const activeRegion = app.selection && app.selection.type === 'region'
       ? app.selection.id
       : app.currentRegion;
+    const visibleCount = app.project.regions.length - app.hiddenRegions.size;
+    if (els.regionSummary) els.regionSummary.textContent = visibleCount + '/' + app.project.regions.length;
     const html = app.project.regions.map(region => {
       const count = app.project.rooms.filter(room => room.region === region.id).length;
       const color = MV.regionColor(region, app.colorMode);
-      return `<div class="region-row ${region.id === activeRegion ? 'is-active' : ''}" data-region="${esc(region.id)}" role="button" tabindex="0" title="${esc(region.code)} / ${count} rooms">
+      const hidden = app.hiddenRegions.has(region.id);
+      return `<div class="region-row ${region.id === activeRegion ? 'is-active' : ''} ${hidden ? 'is-hidden' : ''}" data-region="${esc(region.id)}" role="button" tabindex="0" title="${esc(region.code)} / ${count} rooms">
+        <input class="region-visible" type="checkbox" data-region-visible="${esc(region.id)}" ${hidden ? '' : 'checked'} title="${hidden ? '显示' : '隐藏'} ${esc(region.name)}" aria-label="${hidden ? '显示' : '隐藏'} ${esc(region.name)}">
         <span class="region-swatch" style="background:${color}"></span>
         <span class="region-name">${esc(region.name)}</span>
         <span class="region-count">${String(count).padStart(2, '0')}</span>
@@ -629,8 +663,12 @@
       <p class="hint-line">区域用于给房间分组、着色和统计。新增房间会放入当前选中的区域。基座高度只影响 3D 视图，可把不同区域叠成不同楼层。</p>
       <div class="btn-row">
         <button class="btn" data-action="set-current-region">设为当前区域</button>
+        <button class="btn" data-action="solo-region">仅显示此区域</button>
         <button class="btn" data-action="focus-region">聚焦区域</button>
         <button class="btn btn-danger" data-action="delete-region" ${rooms.length ? 'disabled title="先清空该区域的房间"' : ''}>删除区域</button>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-ghost" data-action="show-all-regions">显示全部区域</button>
       </div>`;
   }
 
@@ -837,6 +875,8 @@
     else if (action === 'spread-layout') spreadLayout();
     else if (action === 'swap-link') swapLink();
     else if (action === 'set-current-region') { app.currentRegion = app.selection.id; renderRegionList(); persistUI(); toast('当前区域已切换'); }
+    else if (action === 'solo-region') { if (app.selection && app.selection.type === 'region') soloRegion(app.selection.id); }
+    else if (action === 'show-all-regions') showAllRegions();
     else if (action === 'focus-region') focusRegion(app.selection.id);
     else if (action === 'delete-ability') deleteAbility(actionBtn.dataset.ability);
     else if (action === 'add-ability') addAbility();
@@ -996,6 +1036,7 @@
           <li><strong>3D 地图</strong>回答“这些房间长什么样、如何垂直连接”，参考 MP1 地图的体块化读法：房间是块，连接是线，区域是底板。</li>
           <li><strong>阶段着色</strong>把可达性分析的结果投射回地图，让你一眼看到前中后期的空间分布。</li>
           <li><strong>语义配色</strong>：区域色、阶段色、门锁色和道具色分别承载不同信息，可在配色面板中自定义。</li>
+          <li><strong>区域过滤</strong>：可只显示一个或多个区域；过滤只影响地图显示，分析与路线判定仍基于完整项目。</li>
           <li><strong>主线高亮</strong>用最短路径给出终局路线骨架；它不替代完整流程，但能快速暴露“主路过长 / 主路过短 / 终局区域太早暴露”等问题。</li>
           <li><strong>门锁统计</strong>检查门锁类型是否过于单一。全图都是导弹门，会让能力节奏变得扁平。</li>
         </ul>
@@ -1158,6 +1199,7 @@
       if (app.project.regions.length <= 1) { toast('至少保留一个区域', true); return; }
       snapshot();
       app.project.regions = app.project.regions.filter(region => region.id !== sel.id);
+      app.hiddenRegions.delete(sel.id);
       app.selection = null;
       app.currentRegion = app.project.regions[0].id;
       app.analysis = MV.analyze(app.project);
@@ -1243,6 +1285,101 @@
     markDirty();
     refreshAll();
     toast('区域已添加');
+  }
+
+  function selectionInRegion(regionId) {
+    const sel = app.selection;
+    if (!sel) return false;
+    if (sel.type === 'region') return sel.id === regionId;
+    if (sel.type === 'room') {
+      const room = MV.findRoom(app.project, sel.id);
+      return !!room && room.region === regionId;
+    }
+    if (sel.type === 'item') {
+      const item = MV.findItem(app.project, sel.id);
+      const room = item ? MV.findRoom(app.project, item.room) : null;
+      return !!room && room.region === regionId;
+    }
+    if (sel.type === 'link') {
+      const link = MV.findLink(app.project, sel.id);
+      if (!link) return false;
+      const a = MV.findRoom(app.project, link.a);
+      const b = MV.findRoom(app.project, link.b);
+      return !!((a && a.region === regionId) || (b && b.region === regionId));
+    }
+    return false;
+  }
+
+  function clearSelectionIfHidden() {
+    if (!app.selection) return;
+    if (app.selection.type === 'region' && app.hiddenRegions.has(app.selection.id)) {
+      app.selection = null;
+      renderRightPanel();
+      return;
+    }
+    if (app.selection.type === 'room' || app.selection.type === 'item' || app.selection.type === 'link') {
+      for (const id of app.hiddenRegions) {
+        if (selectionInRegion(id)) {
+          app.selection = null;
+          renderRightPanel();
+          return;
+        }
+      }
+    }
+  }
+
+  function toggleRegionVisibility(regionId, visible) {
+    const region = app.project.regions.find(r => r.id === regionId);
+    if (!region) return;
+    if (visible) app.hiddenRegions.delete(regionId);
+    else app.hiddenRegions.add(regionId);
+    if (!visible && app.currentRegion === regionId) {
+      const firstVisible = app.project.regions.find(r => !app.hiddenRegions.has(r.id));
+      if (firstVisible) app.currentRegion = firstVisible.id;
+    }
+    clearSelectionIfHidden();
+    app.hover = null;
+    hideTooltip();
+    renderRegionList();
+    syncViews();
+    scheduleRender();
+    updateStatus();
+    persistUI();
+  }
+
+  function showAllRegions() {
+    if (!app.hiddenRegions.size) {
+      toast('当前已显示全部区域');
+      return;
+    }
+    app.hiddenRegions.clear();
+    app.hover = null;
+    clearSelectionIfHidden();
+    renderRegionList();
+    syncViews();
+    if (app.mode === '2d') fit2DReadable();
+    else fit3D();
+    updateStatus();
+    persistUI();
+    toast('已显示全部区域');
+  }
+
+  function soloRegion(regionId) {
+    const region = app.project.regions.find(r => r.id === regionId);
+    if (!region) return;
+    app.hiddenRegions = new Set(
+      app.project.regions.filter(r => r.id !== regionId).map(r => r.id)
+    );
+    app.currentRegion = regionId;
+    app.hover = null;
+    clearSelectionIfHidden();
+    renderRegionList();
+    syncViews();
+    if (app.mode === '2d') focusRegion(regionId);
+    else fit3D();
+    updateStatus();
+    persistUI();
+    toast('仅显示区域：' + region.name);
   }
 
   function spreadLayout() {
@@ -1469,7 +1606,7 @@
       app.fitted2d = false;
       return;
     }
-    app.view2d.cam = MV.Render2D.fitCamera(app.project, W, H, W < 700 ? 44 : 100);
+    app.view2d.cam = MV.Render2D.fitCamera(visibleProject(), W, H, W < 700 ? 44 : 100);
     app.fitted2d = true;
     scheduleRender();
     updateStatusZoom();
@@ -1497,8 +1634,8 @@
       app.fitted3d = false;
       return;
     }
-    app.view3d.center2d = MV.Render3D.mapCenter(app.project);
-    app.view3d.cam = MV.Render3D.fitCamera(app.project, W, H);
+    app.view3d.center2d = MV.Render3D.mapCenter(visibleProject());
+    app.view3d.cam = MV.Render3D.fitCamera(visibleProject(), W, H);
     app.fitted3d = true;
     scheduleRender();
     updateStatusZoom();
@@ -1713,7 +1850,7 @@
     }
     if (e.button !== 0) return;
 
-    const hit = MV.Render3D.pick(app.project, app.view3d, W, H, pos.x, pos.y);
+    const hit = MV.Render3D.pick(visibleProject(), app.view3d, W, H, pos.x, pos.y);
     if (!hit) { clearSelection(); hideTooltip(); return; }
     const room = MV.findRoom(app.project, hit.id);
     if (!room) return;
@@ -1854,7 +1991,7 @@
       updateHover(hit, pos);
       if (app.tool === 'connect') scheduleRender();
     } else {
-      const hit = MV.Render3D.pick(app.project, app.view3d, W, H, pos.x, pos.y);
+      const hit = MV.Render3D.pick(visibleProject(), app.view3d, W, H, pos.x, pos.y);
       updateHover(hit, pos);
       els.statusCoords.textContent = 'YAW ' + Math.round(app.view3d.cam.yaw * 180 / Math.PI) + '° / PITCH ' + Math.round(app.view3d.cam.pitch * 180 / Math.PI) + '°';
     }
@@ -2097,7 +2234,7 @@
   }
 
   function exportPNG() {
-    MV.Render2D.exportPNG(app.project, app.view2d).then(result => {
+    MV.Render2D.exportPNG(visibleProject(), app.view2d).then(result => {
       const name = MV.slugify(app.project.meta.title || 'route') + '-route.png';
       MV.download(name, result.blob);
       toast('路线 PNG 已导出');
@@ -2121,6 +2258,7 @@
     app.history.clear();
     app.selection = null;
     app.hover = null;
+    app.hiddenRegions.clear();
     app.currentRegion = app.project.regions[0].id;
     app.analysis = MV.analyze(app.project);
     app.dirty = false;
@@ -2372,6 +2510,8 @@
         <div class="shortcut-grid">${rows.map(row => `<div class="shortcut-row"><span>${row[1]}</span><kbd>${row[0]}</kbd></div>`).join('')}</div>
         <div class="section-label">外观与配色</div>
         <p class="about-copy">顶栏的太阳 / 月亮按钮切换白天与黑夜主题；调色盘按钮打开配色面板，可在彩色与单色之间切换，逐段编辑阶段色带，并为每个区域单独指定颜色。彩色模式下，房间顶边表示区域、底边表示阶段，门锁与道具使用各自的语义色。</p>
+        <div class="section-label">区域过滤</div>
+        <p class="about-copy">左侧区域列表的复选框控制 2D / 3D 显示，可同时隐藏多个区域；区域检查器里有“仅显示此区域”，区域标题右侧的“全部”恢复所有区域。过滤只影响地图显示，不改变进度分析与路线判定。</p>
         <div class="section-label">数据</div>
         <p class="about-copy">项目自动保存在浏览器 localStorage。顶栏的保存按钮会立即写入；导出 JSON 是长期备份的可靠方式。导入时会先备份当前项目到 <span class="mono">routeforge.backup.v1</span>。PNG 导出会重新排版整张 2D 路线图，不依赖当前缩放。</p>
         <div class="section-label">预设说明</div>
