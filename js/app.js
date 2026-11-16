@@ -1033,8 +1033,9 @@
         <h2>02 / 这个工具如何辅助 3D 银河城</h2>
         <ul>
           <li><strong>2D 路线</strong>回答“玩家按什么顺序获得什么”，适合做锁链、钥匙预算和可选内容密度。</li>
-          <li><strong>3D 地图</strong>回答“这些房间长什么样、如何垂直连接”，参考 MP1 地图的体块化读法：房间是块，连接是线，区域是底板。</li>
+          <li><strong>3D 地图</strong>回答“这些房间长什么样、如何垂直连接”，参考 MP1 地图的体块化读法：房间是块，连接是实体走廊与竖井，区域是底板。</li>
           <li><strong>阶段着色</strong>把可达性分析的结果投射回地图，让你一眼看到前中后期的空间分布。</li>
+          <li><strong>3D 通道</strong>：普通走廊使用目标区域色，带门锁的走廊使用门锁色；竖井建模区域升降机，门框表示连接点。</li>
           <li><strong>语义配色</strong>：区域色、阶段色、门锁色和道具色分别承载不同信息，可在配色面板中自定义。</li>
           <li><strong>区域过滤</strong>：可只显示一个或多个区域；过滤只影响地图显示，分析与路线判定仍基于完整项目。</li>
           <li><strong>主线高亮</strong>用最短路径给出终局路线骨架；它不替代完整流程，但能快速暴露“主路过长 / 主路过短 / 终局区域太早暴露”等问题。</li>
@@ -2363,6 +2364,7 @@
 
         <div class="section-label">门锁颜色</div>
         <div class="gate-color-legend">${gateLegend}</div>
+        <p class="hint-line">3D 走廊：普通通道使用目标区域色，带门锁的通道使用门锁色；选中房间时，该房间的所有走廊会高亮。</p>
         <div class="btn-row">
           <button class="btn btn-ghost" data-reset-colors>恢复默认配色</button>
         </div>

@@ -20,14 +20,14 @@
   ];
 
   const ROOM_TYPES = [
-    { id: 'normal', name: '普通房间', code: 'ROOM', height: 38, depth: 38 },
-    { id: 'start', name: '起点 / 着陆', code: 'START', height: 42, depth: 44 },
-    { id: 'hub', name: '枢纽大厅', code: 'HUB', height: 58, depth: 52 },
-    { id: 'boss', name: 'Boss 战房', code: 'BOSS', height: 68, depth: 58 },
-    { id: 'save', name: '存档 / 安全屋', code: 'SAVE', height: 30, depth: 32 },
-    { id: 'transit', name: '升降机 / 换乘', code: 'ELEV', height: 24, depth: 30 },
-    { id: 'hazard', name: '环境危害区', code: 'HAZARD', height: 40, depth: 40 },
-    { id: 'goal', name: '终点 / 决战', code: 'GOAL', height: 72, depth: 64 }
+    { id: 'normal', name: '普通房间', code: 'ROOM', height: 38, depth: 38, color: '#8f98a8' },
+    { id: 'start', name: '起点 / 着陆', code: 'START', height: 42, depth: 44, color: '#6fcf97' },
+    { id: 'hub', name: '枢纽大厅', code: 'HUB', height: 58, depth: 52, color: '#64b5f6' },
+    { id: 'boss', name: 'Boss 战房', code: 'BOSS', height: 68, depth: 58, color: '#ef5350' },
+    { id: 'save', name: '存档 / 安全屋', code: 'SAVE', height: 30, depth: 32, color: '#4db6ac' },
+    { id: 'transit', name: '升降机 / 换乘', code: 'ELEV', height: 24, depth: 30, color: '#90a4ae' },
+    { id: 'hazard', name: '环境危害区', code: 'HAZARD', height: 40, depth: 40, color: '#ffb74d' },
+    { id: 'goal', name: '终点 / 决战', code: 'GOAL', height: 72, depth: 64, color: '#ffd54f' }
   ];
 
   const REGION_COLORS = [
@@ -150,7 +150,10 @@
       infoStroke: 'rgba(255,255,255,0.16)',
       infoInk: 'rgba(255,255,255,0.72)',
       corridor: 'rgba(255,255,255,0.18)',
-      corridorStroke: 'rgba(255,255,255,0.32)'
+      corridorStroke: 'rgba(255,255,255,0.32)',
+      corridorTop: 'rgb(72,72,78)',
+      corridorSide: 'rgb(48,48,54)',
+      corridorEdge: 'rgba(255,255,255,0.38)'
     },
     light: {
       name: 'light',
@@ -226,7 +229,10 @@
       infoStroke: 'rgba(0,0,0,0.16)',
       infoInk: 'rgba(0,0,0,0.7)',
       corridor: 'rgba(0,0,0,0.2)',
-      corridorStroke: 'rgba(0,0,0,0.36)'
+      corridorStroke: 'rgba(0,0,0,0.36)',
+      corridorTop: 'rgb(200,200,194)',
+      corridorSide: 'rgb(176,176,169)',
+      corridorEdge: 'rgba(0,0,0,0.4)'
     }
   };
 
