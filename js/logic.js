@@ -165,6 +165,24 @@
     const goalReached = !!(project.goalRoom && finalReachable.has(project.goalRoom));
     const pathInfo = reconstructPath(finalBfs.parent, project.goalRoom);
 
+    /* gate chains along the final shortest path for each room, used by the lock tree */
+    const linkMap = {};
+    links.forEach(link => { linkMap[link.id] = link; });
+    const isGateLink = link => !!link && ((link.requires && link.requires.length > 0) || (Number(link.keyReq) || 0) > 0);
+    const gateChains = {};
+    rooms.forEach(room => {
+      const chain = [];
+      let cursor = room.id;
+      let guard = 0;
+      while (cursor && finalBfs.parent[cursor] && guard++ < 400) {
+        const step = finalBfs.parent[cursor];
+        const link = linkMap[step.link];
+        if (isGateLink(link)) chain.push(link.id);
+        cursor = step.room;
+      }
+      gateChains[room.id] = chain.reverse();
+    });
+
     /* -------- stats -------- */
     const openCount = links.filter(link => canPass(link, abilities, keys)).length;
     const lockedLinks = links.filter(link => !canPass(link, abilities, keys));
@@ -303,6 +321,7 @@
       goalReachedStep,
       path: pathInfo.path,
       pathLinks: pathInfo.pathLinks,
+      gateChains,
       warnings,
       unreachableRooms: unreachableRooms.map(room => room.id),
       unreachableItems: unreachableItems.map(item => item.id),

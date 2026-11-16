@@ -42,6 +42,10 @@
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.8 17 6.5v7L10 17.2 3 13.5v-7z"/><path d="M3 6.5 10 10l7-3.5M10 10v7.2"/></svg>
         <span>3D 地图</span><kbd>2</kbd>
       </button>
+      <button class="mode-tab" data-mode="tree" role="tab">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="4.5" cy="10" r="1.8"/><circle cx="15.5" cy="5.2" r="1.8"/><circle cx="15.5" cy="14.8" r="1.8"/><path d="M6 9.2 13.7 5.8M6 10.8l7.7 3.4"/></svg>
+        <span>能力锁树</span><kbd>3</kbd>
+      </button>
     </nav>
 
     <div class="top-actions">
@@ -177,6 +181,28 @@
           <span class="mono">LMB 移动</span><span class="hud-sep">/</span><span class="mono">RMB 旋转</span><span class="hud-sep">/</span><span class="mono">MMB 平移</span><span class="hud-sep">/</span><span class="mono">SHIFT 高度</span><span class="hud-sep">/</span><span class="mono">F 聚焦</span>
         </div>
       </div>
+
+      <div id="stageTree" class="stage-view">
+        <canvas id="canvasTree"></canvas>
+        <div class="stage-hud top">
+          <div class="hud-chip">能力锁树：能力 / 钥匙 → 门锁 → 后续道具</div>
+          <div class="hud-chip subtle" id="treeSummary"></div>
+        </div>
+        <div class="tree-legend">
+          <span><i class="tree-sw item"></i>能力</span>
+          <span><i class="tree-sw gate"></i>门锁</span>
+          <span><i class="tree-sw key"></i>钥匙</span>
+          <span><i class="tree-sw optional"></i>可选</span>
+          <span><i class="tree-sw main"></i>主线</span>
+        </div>
+        <div class="view-controls tree-controls">
+          <button data-tree-main title="强调主线路径">MAIN</button>
+          <button data-tree-fit title="适应全部节点">FIT</button>
+        </div>
+        <div class="stage-hud bottom">
+          <span class="mono">拖动平移</span><span class="hud-sep">/</span><span class="mono">滚轮缩放</span><span class="hud-sep">/</span><span class="mono">单击节点检查</span><span class="hud-sep">/</span><span class="mono">双击定位到 2D</span>
+        </div>
+      </div>
       <div id="canvasTooltip" class="canvas-tooltip" hidden></div>
     </main>
 
@@ -213,6 +239,7 @@
 <script src="js/logic.js"></script>
 <script src="js/render2d.js"></script>
 <script src="js/render3d.js"></script>
+<script src="js/tree.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

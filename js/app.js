@@ -28,8 +28,11 @@
     exportPngBtn: $('exportPngBtn'),
     stage2d: $('stage2d'),
     stage3d: $('stage3d'),
+    stageTree: $('stageTree'),
     canvas2d: $('canvas2d'),
     canvas3d: $('canvas3d'),
+    canvasTree: $('canvasTree'),
+    treeSummary: $('treeSummary'),
     toolHint: $('toolHint'),
     toolHint3d: $('toolHint3d'),
     connectHint: $('connectHint'),
@@ -63,11 +66,16 @@
     },
     view2d: null,
     view3d: null,
+    viewTree: null,
     history: new MV.History(100),
     dirty: false,
     lastSaved: 0,
     drag: null,
+    treeDrag: null,
+    lastTreeClick: null,
     hover: null,
+    treeHover: null,
+    treeMainOnly: false,
     connectFrom: null,
     spaceDown: false,
     editGroup: false,
@@ -75,7 +83,8 @@
     modal: null,
     raf: 0,
     fitted2d: true,
-    fitted3d: false
+    fitted3d: false,
+    fittedTree: false
   };
 
   let toastTimer = null;
@@ -91,7 +100,9 @@
       hiddenRegions: Array.from(app.hiddenRegions),
       currentRegion: app.currentRegion,
       cam2d: app.view2d ? app.view2d.cam : null,
-      cam3d: app.view3d ? app.view3d.cam : null
+      cam3d: app.view3d ? app.view3d.cam : null,
+      camTree: app.viewTree ? app.viewTree.cam : null,
+      treeMainOnly: app.treeMainOnly
     });
   }, 250);
 
@@ -115,6 +126,8 @@
       });
     }
     if (savedUI.mode === '3d') app.mode = '3d';
+    if (savedUI.mode === 'tree') app.mode = 'tree';
+    if (typeof savedUI.treeMainOnly === 'boolean') app.treeMainOnly = savedUI.treeMainOnly;
     if (savedUI.colorMode === 'mono' || savedUI.colorMode === 'color') app.colorMode = savedUI.colorMode;
     if (['inspect', 'progress', 'guide'].includes(savedUI.rightTab)) app.rightTab = savedUI.rightTab;
     if (['ability', 'key', 'upgrade', 'boss'].includes(savedUI.itemKind)) app.itemKind = savedUI.itemKind;
@@ -165,6 +178,15 @@
       analysis: app.analysis
     };
     app.fitted3d = !!cam3;
+    const camTree = savedUI.camTree && typeof savedUI.camTree.zoom === 'number' ? savedUI.camTree : null;
+    app.viewTree = {
+      cam: camTree || { x: 0, y: 0, zoom: 0.5 },
+      selection: null,
+      hover: null,
+      analysis: app.analysis,
+      mainOnly: app.treeMainOnly
+    };
+    app.fittedTree = !!camTree;
 
     bindUI();
     applyModeUI();
@@ -175,9 +197,11 @@
     const ro = new ResizeObserver(() => scheduleRender());
     ro.observe(els.stage2d);
     ro.observe(els.stage3d);
+    ro.observe(els.stageTree);
     window.addEventListener('resize', scheduleRender);
     requestAnimationFrame(() => {
       if (app.mode === '3d' && !app.fitted3d) fit3D();
+      if (app.mode === 'tree' && !app.fittedTree) fitTree(true);
       scheduleRender();
     });
   }
@@ -295,6 +319,21 @@
 
     bindCanvas(els.canvas2d, '2d');
     bindCanvas(els.canvas3d, '3d');
+    bindTreeCanvas(els.canvasTree);
+
+    document.querySelectorAll('[data-tree-fit]').forEach(btn => {
+      btn.addEventListener('click', () => fitTree(false));
+    });
+    document.querySelectorAll('[data-tree-main]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        app.treeMainOnly = !app.treeMainOnly;
+        app.viewTree.mainOnly = app.treeMainOnly;
+        btn.classList.toggle('is-active', app.treeMainOnly);
+        syncViews();
+        scheduleRender();
+        persistUI();
+      });
+    });
 
     els.modalRoot.addEventListener('click', onModalClick);
 
@@ -322,6 +361,117 @@
     canvas.addEventListener('wheel', e => onWheel(e, mode), { passive: false });
   }
 
+  function selectTreeNode(node) {
+    if (!node) return;
+    if (node.type === 'item') select('item', node.itemId);
+    else if (node.type === 'gate') select('link', node.linkId);
+    else if (node.type === 'root') select('room', app.project.startRoom);
+    else if (node.type === 'keypool') {
+      app.selection = null;
+      app.rightTab = 'inspect';
+      renderRightPanel();
+      toast('全局钥匙池：' + node.sub);
+    }
+  }
+
+  function focusTreeNode(node) {
+    if (!node || node.type === 'keypool') return;
+    selectTreeNode(node);
+    switchMode('2d');
+    requestAnimationFrame(() => focusSelection());
+  }
+
+  function bindTreeCanvas(canvas) {
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
+    canvas.addEventListener('pointerdown', e => {
+      const pos = pointerPos(e, canvas);
+      const W = canvasW(canvas), H = canvasH(canvas);
+      if (e.button === 1 || e.button === 2 || app.spaceDown) {
+        app.treeDrag = {
+          startX: pos.x, startY: pos.y,
+          startCam: { x: app.viewTree.cam.x, y: app.viewTree.cam.y },
+          canvas, moved: false
+        };
+        canvas.setPointerCapture(e.pointerId);
+        updateCursor();
+        return;
+      }
+      if (e.button !== 0) return;
+      const hit = MV.RenderTree.pick(app.viewTree, W, H, pos.x, pos.y);
+      if (hit) {
+        const now = Date.now();
+        if (app.lastTreeClick && app.lastTreeClick.id === hit.id && now - app.lastTreeClick.time < 340) {
+          app.lastTreeClick = null;
+          focusTreeNode(hit);
+          return;
+        }
+        app.lastTreeClick = { id: hit.id, time: now };
+        selectTreeNode(hit);
+        return;
+      }
+      app.lastTreeClick = null;
+      app.treeDrag = {
+        startX: pos.x, startY: pos.y,
+        startCam: { x: app.viewTree.cam.x, y: app.viewTree.cam.y },
+        canvas, moved: false
+      };
+      canvas.setPointerCapture(e.pointerId);
+      updateCursor();
+    });
+    canvas.addEventListener('pointermove', e => {
+      const pos = pointerPos(e, canvas);
+      const W = canvasW(canvas), H = canvasH(canvas);
+      if (app.treeDrag) {
+        const drag = app.treeDrag;
+        if (Math.abs(pos.x - drag.startX) + Math.abs(pos.y - drag.startY) > 2) drag.moved = true;
+        const zoom = app.viewTree.cam.zoom;
+        app.viewTree.cam.x = drag.startCam.x - (pos.x - drag.startX) / zoom;
+        app.viewTree.cam.y = drag.startCam.y - (pos.y - drag.startY) / zoom;
+        scheduleRender();
+        return;
+      }
+      const hit = MV.RenderTree.pick(app.viewTree, W, H, pos.x, pos.y);
+      const same = (hit && app.treeHover && hit.id === app.treeHover.id) || (!hit && !app.treeHover);
+      if (!same) {
+        app.treeHover = hit;
+        app.viewTree.hover = hit;
+        scheduleRender();
+      }
+    });
+    canvas.addEventListener('pointerup', e => {
+      if (!app.treeDrag) return;
+      const moved = app.treeDrag.moved;
+      app.treeDrag = null;
+      updateCursor();
+      scheduleRender();
+      if (moved) persistUI();
+    });
+    canvas.addEventListener('pointercancel', () => {
+      app.treeDrag = null;
+      updateCursor();
+    });
+    canvas.addEventListener('pointerleave', () => {
+      if (!app.treeDrag && app.treeHover) {
+        app.treeHover = null;
+        app.viewTree.hover = null;
+        scheduleRender();
+      }
+    });
+    canvas.addEventListener('dblclick', e => {
+      const pos = pointerPos(e, canvas);
+      const hit = MV.RenderTree.pick(app.viewTree, canvasW(canvas), canvasH(canvas), pos.x, pos.y);
+      if (hit) focusTreeNode(hit);
+    });
+    canvas.addEventListener('wheel', e => {
+      e.preventDefault();
+      const pos = pointerPos(e, canvas);
+      MV.RenderTree.zoomAt(app.viewTree, canvasW(canvas), canvasH(canvas), pos.x, pos.y, e.deltaY < 0 ? 1.12 : 1 / 1.12);
+      scheduleRender();
+      updateStatusZoom();
+      persistUI();
+    }, { passive: false });
+  }
+
   /* ============================================================
      rendering
      ============================================================ */
@@ -339,6 +489,10 @@
     app.view3d.hover = app.hover;
     app.view3d.analysis = app.analysis;
     app.view3d.colorMode = app.colorMode;
+    app.viewTree.selection = app.selection;
+    app.viewTree.hover = app.treeHover;
+    app.viewTree.analysis = app.analysis;
+    app.viewTree.mainOnly = app.treeMainOnly;
   }
 
   function visibleProject() {
@@ -360,11 +514,15 @@
     app.raf = requestAnimationFrame(() => {
       app.raf = 0;
       syncViews();
-      const project = visibleProject();
-      if (app.mode === '2d') {
-        MV.Render2D.draw(els.canvas2d, project, app.view2d);
+      if (app.mode === 'tree') {
+        MV.RenderTree.draw(els.canvasTree, app.project, app.viewTree);
       } else {
-        MV.Render3D.draw(els.canvas3d, project, app.view3d);
+        const project = visibleProject();
+        if (app.mode === '2d') {
+          MV.Render2D.draw(els.canvas2d, project, app.view2d);
+        } else {
+          MV.Render3D.draw(els.canvas3d, project, app.view3d);
+        }
       }
       updateStatusZoom();
     });
@@ -376,8 +534,20 @@
     renderRightPanel();
     updateStatus();
     updateHistoryButtons();
+    updateTreeSummary();
     syncViews();
     scheduleRender();
+  }
+
+  function updateTreeSummary() {
+    if (!els.treeSummary || !app.analysis) return;
+    const graph = MV.buildLockTree(app.project, app.analysis);
+    const meta = graph.meta;
+    els.treeSummary.textContent = meta.nodes + ' nodes / ' + meta.layers + ' layers / ' + meta.gates + ' gates' +
+      (meta.optional ? ' / ' + meta.optional + ' optional' : '') +
+      (meta.cycles ? ' / ' + meta.cycles + ' cycles' : '');
+    const mainBtn = document.querySelector('[data-tree-main]');
+    if (mainBtn) mainBtn.classList.toggle('is-active', app.treeMainOnly);
   }
 
   function updateHeader() {
@@ -403,7 +573,7 @@
   function updateStatus() {
     const counts = MV.projectCounts(app.project);
     const visibleRegions = counts.regions - app.hiddenRegions.size;
-    els.statusMode.textContent = app.mode === '2d' ? '2D ROUTE' : '3D MASSING';
+    els.statusMode.textContent = app.mode === '2d' ? '2D ROUTE' : (app.mode === '3d' ? '3D MASSING' : 'LOCK TREE');
     els.statusCounts.textContent = counts.regions + ' regions / ' + counts.rooms + ' rooms / ' + counts.links + ' links / ' + counts.items + ' items' +
       (app.hiddenRegions.size ? ' · ' + visibleRegions + '/' + counts.regions + ' regions visible' : '');
     if (app.analysis) {
@@ -419,8 +589,10 @@
   function updateStatusZoom() {
     if (app.mode === '2d') {
       els.statusZoom.textContent = Math.round(app.view2d.cam.zoom * 100) + '%';
-    } else {
+    } else if (app.mode === '3d') {
       els.statusZoom.textContent = 'DIST ' + Math.round(app.view3d.cam.dist);
+    } else {
+      els.statusZoom.textContent = Math.round(app.viewTree.cam.zoom * 100) + '%';
     }
   }
 
@@ -1040,11 +1212,19 @@
           <li><strong>区域过滤</strong>：可只显示一个或多个区域；过滤只影响地图显示，分析与路线判定仍基于完整项目。</li>
           <li><strong>主线高亮</strong>用最短路径给出终局路线骨架；它不替代完整流程，但能快速暴露“主路过长 / 主路过短 / 终局区域太早暴露”等问题。</li>
           <li><strong>门锁统计</strong>检查门锁类型是否过于单一。全图都是导弹门，会让能力节奏变得扁平。</li>
+          <li><strong>能力锁树</strong>把能力、钥匙、门锁和后续道具整理成依赖图，专门检查锁链结构与软锁。</li>
         </ul>
       </section>
 
       <section>
-        <h2>03 / 设计检查表</h2>
+        <h2>03 / 能力锁树</h2>
+        <p>能力锁树把“能力 / 钥匙 → 门锁 → 后续道具”画成一张分层图。它回答的不是房间长什么样，而是<strong>路线的因果结构</strong>：哪个能力解开了哪扇门，哪件道具又是从哪扇门后面获得的。Boss Keys 式的锁钥分析通常关注这条链是否过长、是否出现单一能力垄断、钥匙预算是否迫使玩家回顾整张地图。</p>
+        <div class="guide-card"><h3>怎么读</h3><p>左侧是起始房间，向右是后续解锁。蓝色节点是能力，金色是全局钥匙预算，彩色小方块是门锁，虚线节点是可选择强化。橙色 / 红色边表示“需求”，彩色边表示“解锁”。主线节点会带一条竖线标记。</p></div>
+        <div class="guide-card"><h3>怎么用</h3><p>单击节点在右侧检查器里查看对应物品或连接；双击节点或按 F 切到 2D 并定位。用 MAIN 按钮压暗非主线节点，检查关键路径是否过度依赖单一能力或单一区域。</p></div>
+      </section>
+
+      <section>
+        <h2>04 / 设计检查表</h2>
         <ul>
           <li>起点区域是否有一间“安全屋”，让玩家理解操作与地图语言？</li>
           <li>前 15 分钟是否至少获得一个改变移动方式的能力？</li>
@@ -1059,7 +1239,7 @@
       </section>
 
       <section>
-        <h2>04 / 门锁速查</h2>
+        <h2>05 / 门锁速查</h2>
         <table class="matrix">
           <thead><tr><th>类型</th><th>需求</th><th>说明</th></tr></thead>
           <tbody>${gateRows}</tbody>
@@ -1067,7 +1247,7 @@
       </section>
 
       <section>
-        <h2>05 / 参考与说明</h2>
+        <h2>06 / 参考与说明</h2>
         <p>预设是基于公开地图、攻略与 Wiki 整理的<strong>结构化参考</strong>，用于演示锁链与区域关系，不是官方地图的一比一复刻。房间坐标、部分道具位置与门锁方向为设计演示做了简化。</p>
         <div class="guide-sources">
           ${sources.map(src => `<a href="${esc(src[1])}" target="_blank" rel="noreferrer">${esc(src[0])} ↗</a>`).join('')}
@@ -1547,9 +1727,12 @@
       else if (app.tool === 'room' || app.tool === 'connect') cursor = 'crosshair';
       else if (app.tool === 'item') cursor = 'copy';
       else if (app.tool === 'pan') cursor = 'grab';
+    } else if (app.mode === 'tree') {
+      cursor = app.treeDrag ? 'grabbing' : 'grab';
     }
     els.canvas2d.style.cursor = cursor;
     els.canvas3d.style.cursor = 'default';
+    els.canvasTree.style.cursor = cursor;
   }
 
   function applyTheme(theme, persist) {
@@ -1569,11 +1752,14 @@
     if (app.mode === mode) return;
     app.mode = mode;
     app.hover = null;
+    app.treeHover = null;
+    app.lastTreeClick = null;
     hideTooltip();
     applyModeUI();
     requestAnimationFrame(() => {
       if (mode === '2d' && !app.fitted2d) fit2DReadable();
       if (mode === '3d' && !app.fitted3d) fit3D();
+      if (mode === 'tree' && !app.fittedTree) fitTree(true);
       scheduleRender();
       updateStatus();
     });
@@ -1589,7 +1775,11 @@
     });
     els.stage2d.classList.toggle('is-active', app.mode === '2d');
     els.stage3d.classList.toggle('is-active', app.mode === '3d');
-    els.statusMode.textContent = app.mode === '2d' ? '2D ROUTE' : '3D MASSING';
+    els.stageTree.classList.toggle('is-active', app.mode === 'tree');
+    document.documentElement.dataset.mode = app.mode;
+    els.statusMode.textContent = app.mode === '2d' ? '2D ROUTE' : (app.mode === '3d' ? '3D MASSING' : 'LOCK TREE');
+    const mainBtn = document.querySelector('[data-tree-main]');
+    if (mainBtn) mainBtn.classList.toggle('is-active', app.treeMainOnly);
     if (app.mode === '2d') els.toolHint.textContent = '选择：单击房间，拖动移动，拖角缩放';
     updateCursor();
   }
@@ -1643,15 +1833,38 @@
     persistUI();
   }
 
+  function fitTree(readable) {
+    const W = els.canvasTree.clientWidth;
+    const H = els.canvasTree.clientHeight;
+    if (!W || !H) {
+      app.fittedTree = false;
+      return;
+    }
+    const graph = MV.buildLockTree(app.project, app.analysis);
+    const cam = MV.RenderTree.fitCamera(graph, W, H, 80);
+    if (readable && cam.zoom < (W >= 700 ? 0.5 : 0.42)) {
+      cam.zoom = W >= 700 ? 0.5 : 0.42;
+      cam.x = graph.bounds.minX + (W / 2 - 46) / cam.zoom;
+      cam.y = (graph.bounds.minY + graph.bounds.maxY) / 2;
+    }
+    app.viewTree.cam = cam;
+    app.fittedTree = true;
+    scheduleRender();
+    updateStatusZoom();
+    persistUI();
+  }
+
   function fitAll() {
-    if (app.mode === '2d') {
+    if (app.mode === 'tree') {
+      fitTree(false);
+    } else if (app.mode === '2d') {
       fit2D();
       app.fitted3d = false;
     } else {
       fit3D();
       app.fitted2d = false;
     }
-    toast('视图已适应全部房间');
+    toast('视图已适应全部内容');
   }
 
   function focusRoom(roomId) {
@@ -1672,6 +1885,12 @@
 
   function focusSelection() {
     const sel = app.selection;
+    if (app.mode === 'tree') {
+      if (!sel) { fitTree(false); return; }
+      switchMode('2d');
+      requestAnimationFrame(() => focusSelection());
+      return;
+    }
     if (!sel) { fitAll(); return; }
     if (sel.type === 'room') { focusRoom(sel.id); return; }
     if (sel.type === 'item') {
@@ -2269,9 +2488,15 @@
     if (app.mode === '2d') {
       fit2DReadable();
       app.fitted3d = false;
-    } else {
+      app.fittedTree = false;
+    } else if (app.mode === '3d') {
       fit3D();
       app.fitted2d = false;
+      app.fittedTree = false;
+    } else {
+      fitTree(true);
+      app.fitted2d = false;
+      app.fitted3d = false;
     }
     refreshAll();
     persistUI();
@@ -2485,6 +2710,8 @@
     const rows = [
       ['V / R / C / I / H', '选择 / 房间 / 连接 / 物品 / 平移'],
       ['1 / 2', '2D 路线 / 3D 地图'],
+      ['3', '能力锁树'],
+      ['F', '聚焦当前选择（锁树中按 F 切到 2D 定位）'],
       ['拖动房间', '移动位置'],
       ['拖动角点', '缩放房间'],
       ['空格 + 拖动 / 中键', '平移画布'],
@@ -2514,6 +2741,8 @@
         <p class="about-copy">顶栏的太阳 / 月亮按钮切换白天与黑夜主题；调色盘按钮打开配色面板，可在彩色与单色之间切换，逐段编辑阶段色带，并为每个区域单独指定颜色。彩色模式下，房间顶边表示区域、底边表示阶段，门锁与道具使用各自的语义色。</p>
         <div class="section-label">区域过滤</div>
         <p class="about-copy">左侧区域列表的复选框控制 2D / 3D 显示，可同时隐藏多个区域；区域检查器里有“仅显示此区域”，区域标题右侧的“全部”恢复所有区域。过滤只影响地图显示，不改变进度分析与路线判定。</p>
+        <div class="section-label">能力锁树</div>
+        <p class="about-copy">顶栏第三个模式是能力锁树：它以能力、钥匙和可选强化为节点，以门锁为中间节点，展示“谁打开什么、什么又通向哪里”。单击节点会在右侧检查器里选中对应物品或连接；双击节点或按 F 可切到 2D 并定位。它适合检查能力节奏、钥匙预算和软锁链。</p>
         <div class="section-label">数据</div>
         <p class="about-copy">项目自动保存在浏览器 localStorage。顶栏的保存按钮会立即写入；导出 JSON 是长期备份的可靠方式。导入时会先备份当前项目到 <span class="mono">routeforge.backup.v1</span>。PNG 导出会重新排版整张 2D 路线图，不依赖当前缩放。</p>
         <div class="section-label">预设说明</div>
@@ -2652,6 +2881,7 @@
     }
     if (key === '1') { switchMode('2d'); return; }
     if (key === '2') { switchMode('3d'); return; }
+    if (key === '3') { switchMode('tree'); return; }
     if (key.toLowerCase() === 'v') { setTool('select'); return; }
     if (key.toLowerCase() === 'r') { setTool('room'); return; }
     if (key.toLowerCase() === 'c') { setTool('connect'); return; }
@@ -2677,6 +2907,7 @@
       colorMode: app.colorMode,
       cam2d: MV.clone(app.view2d.cam),
       cam3d: MV.clone(app.view3d.cam),
+      camTree: MV.clone(app.viewTree.cam),
       center2d: MV.clone(app.view3d.center2d),
       selection: app.selection ? MV.clone(app.selection) : null
     })
