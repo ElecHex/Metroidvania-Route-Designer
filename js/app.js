@@ -15,6 +15,7 @@
     exportBtn: $('exportBtn'),
     importBtn: $('importBtn'),
     presetBtn: $('presetBtn'),
+    themeBtn: $('themeBtn'),
     helpBtn: $('helpBtn'),
     toolList: $('toolList'),
     itemKindSeg: $('itemKindSeg'),
@@ -47,6 +48,7 @@
     selection: null,
     tool: 'select',
     mode: '2d',
+    theme: 'dark',
     itemKind: 'ability',
     currentRegion: null,
     rightTab: 'inspect',
@@ -75,6 +77,7 @@
   const persistUI = MV.debounce(() => {
     MV.saveUI({
       mode: app.mode,
+      theme: app.theme,
       tool: app.tool,
       itemKind: app.itemKind,
       rightTab: app.rightTab,
@@ -97,6 +100,8 @@
      ============================================================ */
   function boot() {
     const savedUI = MV.loadUI() || {};
+    app.theme = savedUI.theme === 'light' ? 'light' : 'dark';
+    applyTheme(app.theme, false);
     if (savedUI.layers && typeof savedUI.layers === 'object') {
       Object.keys(app.layers).forEach(key => {
         if (typeof savedUI.layers[key] === 'boolean') app.layers[key] = savedUI.layers[key];
@@ -191,6 +196,9 @@
     els.exportBtn.addEventListener('click', exportJSON);
     els.importBtn.addEventListener('click', () => els.fileInput.click());
     els.presetBtn.addEventListener('click', openPresetModal);
+    els.themeBtn.addEventListener('click', () => {
+      applyTheme(app.theme === 'light' ? 'dark' : 'light', true);
+    });
     els.helpBtn.addEventListener('click', openHelpModal);
     els.exportPngBtn.addEventListener('click', exportPNG);
     els.fileInput.addEventListener('change', importJSON);
@@ -1361,6 +1369,19 @@
     }
     els.canvas2d.style.cursor = cursor;
     els.canvas3d.style.cursor = 'default';
+  }
+
+  function applyTheme(theme, persist) {
+    app.theme = theme === 'light' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = app.theme;
+    MV.setCanvasTheme(app.theme);
+    if (els.themeBtn) {
+      const label = app.theme === 'light' ? '切换到黑夜模式' : '切换到白天模式';
+      els.themeBtn.title = label;
+      els.themeBtn.setAttribute('aria-label', label);
+    }
+    if (app.view2d && app.view3d) scheduleRender();
+    if (persist) persistUI();
   }
 
   function switchMode(mode) {

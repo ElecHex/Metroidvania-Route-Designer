@@ -130,11 +130,12 @@
   }
 
   function drawGrid(ctx, W, H, cam, opts) {
-    ctx.fillStyle = '#0b0b0c';
+    const t = MV.canvasTheme();
+    ctx.fillStyle = t.bg;
     ctx.fillRect(0, 0, W, H);
     const gradient = ctx.createRadialGradient(W * 0.55, H * 0.45, 20, W * 0.55, H * 0.45, Math.max(W, H) * 0.75);
-    gradient.addColorStop(0, 'rgba(255,255,255,0.025)');
-    gradient.addColorStop(0.55, 'rgba(255,255,255,0.005)');
+    gradient.addColorStop(0, t.bgGlow);
+    gradient.addColorStop(0.55, 'rgba(0,0,0,0)');
     gradient.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, W, H);
@@ -148,7 +149,7 @@
     const bottom = s2w(0, H, cam, W, H).y;
 
     ctx.lineWidth = 1;
-    ctx.strokeStyle = opts && opts.export ? 'rgba(255,255,255,0.035)' : 'rgba(255,255,255,0.028)';
+    ctx.strokeStyle = t.grid;
     ctx.beginPath();
     for (let x = Math.floor(left / step) * step; x <= right; x += step) {
       const sx = Math.round((x - cam.x) * cam.zoom + W / 2) + 0.5;
@@ -162,7 +163,7 @@
     }
     ctx.stroke();
 
-    ctx.strokeStyle = opts && opts.export ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.055)';
+    ctx.strokeStyle = t.gridMajor;
     ctx.beginPath();
     for (let x = Math.floor(left / major) * major; x <= right; x += major) {
       const sx = Math.round((x - cam.x) * cam.zoom + W / 2) + 0.5;
@@ -178,6 +179,7 @@
   }
 
   function drawRegionLabels(ctx, project, view, W, H) {
+    const t = MV.canvasTheme();
     const regions = project.regions || [];
     const rooms = project.rooms || [];
     const placed = [];
@@ -220,27 +222,27 @@
       placed.push(rect);
 
       if (tries) {
-        ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+        ctx.strokeStyle = t.labelStroke;
         ctx.beginPath();
         ctx.moveTo(left + 4, top + 20);
         ctx.lineTo(p.x + 4, p.y - 5);
         ctx.stroke();
       }
 
-      ctx.fillStyle = 'rgba(8,8,10,0.78)';
+      ctx.fillStyle = t.labelBg;
       ctx.fillRect(left, top, totalWidth, 20);
-      ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+      ctx.strokeStyle = t.labelStroke;
       ctx.strokeRect(left + 0.5, top + 0.5, totalWidth - 1, 19);
       ctx.fillStyle = tone.color;
       ctx.fillRect(left, top, 2, 20);
       ctx.font = '9px ' + FONT_MONO;
-      ctx.fillStyle = '#8a8a91';
+      ctx.fillStyle = t.inkDim;
       ctx.fillText(region.code, p.x + 3, top + 14);
       ctx.font = '10px ' + FONT_UI;
-      ctx.fillStyle = '#d3d3d7';
+      ctx.fillStyle = t.labelInk;
       ctx.fillText(label, p.x + 3 + codeWidth + 7, top + 14);
       ctx.font = '8px ' + FONT_MONO;
-      ctx.fillStyle = '#77777e';
+      ctx.fillStyle = t.inkFaint;
       ctx.fillText(countText, p.x + 3 + codeWidth + 7 + labelWidth + 8, top + 14);
       ctx.strokeStyle = hexToRgba(tone.color, 0.18);
       ctx.setLineDash([3, 5]);
@@ -254,6 +256,7 @@
   }
 
   function drawLinks(ctx, project, view, W, H, analysis, mode) {
+    const t = MV.canvasTheme();
     const rooms = {};
     project.rooms.forEach(room => { rooms[room.id] = room; });
     const layoutLinks = {};
@@ -271,12 +274,12 @@
       const isPath = pathSet.has(link.id);
       const open = analysis && analysis.openLinks ? analysis.openLinks[link.id] !== undefined : true;
 
-      let stroke = '#3d3d44';
+      let stroke = t.line;
       let width = 1.2;
-      if (isPath) { stroke = 'rgba(255,255,255,0.72)'; width = 1.8; }
-      if (open === false) stroke = '#303036';
-      if (hover) { stroke = '#b7b7bd'; width = 1.8; }
-      if (selected) { stroke = '#ffffff'; width = 2.2; }
+      if (isPath) { stroke = t.lineSelected; width = 1.8; }
+      if (open === false) stroke = t.lineDim;
+      if (hover) { stroke = t.lineHover; width = 1.8; }
+      if (selected) { stroke = t.lineSelected; width = 2.2; }
 
       ctx.save();
       ctx.strokeStyle = stroke;
@@ -291,7 +294,7 @@
       if (link.dir !== 'both') {
         const arrowAt = pointAlong(pts, 0.68);
         const dirSign = link.dir === 'a2b' ? 1 : -1;
-        drawArrow(ctx, arrowAt, dirSign, isPath || selected ? '#fff' : '#5b5b62');
+        drawArrow(ctx, arrowAt, dirSign, isPath || selected ? t.accent : t.inkDim);
       }
 
       const badgeAt = pointAlong(pts, 0.5);
@@ -305,6 +308,7 @@
   }
 
   function drawGateBadges(ctx, project, view, layoutLinks) {
+    const t = MV.canvasTheme();
     project.links.forEach(link => {
       const entry = layoutLinks[link.id];
       if (!entry) return;
@@ -316,8 +320,8 @@
       const bw = 22, bh = 14;
       const x = entry.badge.x - bw / 2, y = entry.badge.y - bh / 2;
       ctx.save();
-      ctx.fillStyle = selected || hover ? '#ededf0' : '#0d0d0f';
-      ctx.strokeStyle = selected || hover ? '#ffffff' : (entry.open ? '#55555c' : '#3b3b41');
+      ctx.fillStyle = selected || hover ? t.gateBgSelected : t.gateBg;
+      ctx.strokeStyle = selected || hover ? t.lineSelected : (entry.open ? t.gateStroke : t.gateStrokeLocked);
       ctx.lineWidth = 1;
       if (gate.style === 'transit') ctx.setLineDash([2, 2]);
       ctx.fillRect(x, y, bw, bh);
@@ -326,7 +330,7 @@
       ctx.font = '7.5px ' + FONT_MONO;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillStyle = selected || hover ? '#09090a' : (entry.open ? '#b9b9c0' : '#6a6a71');
+      ctx.fillStyle = selected || hover ? t.gateInkSelected : (entry.open ? t.gateInk : t.gateInkLocked);
       ctx.fillText(gate.code, entry.badge.x, entry.badge.y + 0.5);
       ctx.textAlign = 'left';
       ctx.textBaseline = 'alphabetic';
@@ -340,9 +344,9 @@
         const tw = ctx.measureText(label).width;
         const lx = entry.badge.x + 15;
         const ly = entry.badge.y + 3;
-        ctx.fillStyle = 'rgba(10,10,12,0.82)';
+        ctx.fillStyle = t.labelBg;
         ctx.fillRect(lx - 3, ly - 9, tw + 6, 13);
-        ctx.fillStyle = selected || hover ? '#ffffff' : '#909097';
+        ctx.fillStyle = selected || hover ? t.inkStrong : t.inkDim;
         ctx.fillText(label, lx, ly);
         ctx.restore();
       }
@@ -366,24 +370,25 @@
   }
 
   function drawItemGlyph(ctx, x, y, size, item) {
+    const t = MV.canvasTheme();
     const cx = x + size / 2, cy = y + size / 2;
     ctx.save();
     if (item.kind === 'key') {
-      ctx.strokeStyle = '#d8d8dc';
+      ctx.strokeStyle = t.itemGlyph;
       ctx.beginPath();
       ctx.arc(cx, cy, 3, 0, Math.PI * 2);
       ctx.stroke();
-      ctx.fillStyle = '#fff';
+      ctx.fillStyle = t.itemGlyph;
       ctx.fillRect(cx - 1, cy + 1, 2, 3);
     } else if (item.kind === 'boss') {
-      ctx.strokeStyle = '#e5e5e8';
+      ctx.strokeStyle = t.itemGlyph;
       ctx.lineWidth = 1.2;
       ctx.beginPath();
       ctx.moveTo(cx - 3, cy - 3); ctx.lineTo(cx + 3, cy + 3);
       ctx.moveTo(cx + 3, cy - 3); ctx.lineTo(cx - 3, cy + 3);
       ctx.stroke();
     } else if (item.kind === 'upgrade') {
-      ctx.strokeStyle = '#aaaab0';
+      ctx.strokeStyle = t.itemGlyphDim;
       ctx.beginPath();
       ctx.arc(cx, cy, 3, 0, Math.PI * 2);
       ctx.stroke();
@@ -392,7 +397,7 @@
       ctx.moveTo(cx - 1.6, cy); ctx.lineTo(cx + 1.6, cy);
       ctx.stroke();
     } else {
-      ctx.fillStyle = '#e4e4e7';
+      ctx.fillStyle = t.itemGlyph;
       ctx.beginPath();
       ctx.moveTo(cx, cy - 3.4);
       ctx.lineTo(cx + 3.4, cy);
@@ -405,6 +410,7 @@
   }
 
   function drawRooms(ctx, project, view, W, H, analysis) {
+    const t = MV.canvasTheme();
     const layoutRooms = {};
     const layoutItems = {};
     const maxPhase = Math.max(1, (analysis && analysis.stepCount ? analysis.stepCount - 1 : 1));
@@ -428,13 +434,13 @@
       const compact = detail && !important && view.cam.zoom < 0.72;
       const showItems = view.cam.zoom >= 0.72 || selected || hover;
 
-      let fill = '#151518';
+      let fill = t.roomFill;
       if (view.layers.phases && analysis && phase !== undefined) {
-        fill = 'rgba(255,255,255,' + (0.025 + phaseT * 0.1).toFixed(3) + ')';
+        fill = MV.hexToRgba(t.accent, 0.025 + phaseT * 0.1);
       }
-      if (hover) fill = '#1b1b20';
-      if (selected) fill = '#242429';
-      if (!reachable) fill = 'rgba(255,255,255,0.008)';
+      if (hover) fill = t.roomHover;
+      if (selected) fill = t.roomSelected;
+      if (!reachable) fill = t.roomUnreachable;
 
       ctx.save();
       ctx.beginPath();
@@ -445,7 +451,7 @@
       if (room.type === 'boss') {
         ctx.save();
         ctx.clip();
-        ctx.strokeStyle = 'rgba(255,255,255,0.035)';
+        ctx.strokeStyle = t.hatch;
         ctx.lineWidth = 1;
         for (let x = p.x - h; x < p.x + w + h; x += 7) {
           ctx.beginPath();
@@ -456,7 +462,8 @@
         ctx.restore();
       }
 
-      ctx.strokeStyle = reachable ? hexToRgba(regionColor, selected ? 0.95 : 0.58) : '#39393f';
+      const borderColor = MV.blendHex(regionColor, t.ink, t.name === 'light' ? 0.45 : 0.08);
+      ctx.strokeStyle = reachable ? hexToRgba(borderColor, selected ? 0.95 : 0.58) : t.roomBorderUnreachable;
       ctx.lineWidth = selected ? 1.5 : 1;
       if (!reachable) ctx.setLineDash([3, 3]);
       if (room.type === 'transit') ctx.setLineDash([5, 3]);
@@ -464,7 +471,7 @@
       ctx.setLineDash([]);
 
       if (room.type === 'goal' || room.id === project.goalRoom) {
-        ctx.strokeStyle = 'rgba(255,255,255,0.26)';
+        ctx.strokeStyle = t.roomBorder;
         ctx.strokeRect(p.x + 3.5, p.y + 3.5, w - 7, h - 7);
       }
 
@@ -473,13 +480,13 @@
       if (detail) {
         if (!compact) {
           ctx.font = '7.5px ' + FONT_MONO;
-          ctx.fillStyle = selected ? '#d8d8dc' : (reachable ? 'rgba(255,255,255,0.38)' : '#4d4d53');
+          ctx.fillStyle = selected ? t.inkStrong : (reachable ? t.roomKicker : t.roomKickerDim);
           ctx.fillText(type.code, p.x + pad, p.y + 11);
         }
 
         if (view.layers.names && h > 18) {
           ctx.font = (compact ? '9px ' : (w < 100 ? '10px ' : '11.5px ')) + FONT_UI;
-          ctx.fillStyle = reachable ? (selected ? '#ffffff' : '#dedee1') : '#5d5d63';
+          ctx.fillStyle = reachable ? (selected ? t.inkStrong : t.roomInk) : t.roomInkDim;
           const nameY = compact ? p.y + 16 : p.y + 25;
           const maxText = Math.max(20, w - pad * 2 - (w > 130 && !compact ? 12 : 0));
           ctx.fillText(truncate(ctx, room.name, maxText), p.x + pad, nameY);
@@ -487,7 +494,7 @@
 
         if (!compact && w > 70 && h > 44) {
           ctx.font = '7px ' + FONT_MONO;
-          ctx.fillStyle = 'rgba(255,255,255,0.2)';
+          ctx.fillStyle = t.inkGhost;
           ctx.textAlign = 'right';
           ctx.fillText(region ? region.code : '', p.x + w - pad, p.y + 11);
           ctx.textAlign = 'left';
@@ -495,13 +502,13 @@
 
         if (!compact && room.type === 'save' && w > 44) {
           const sx = p.x + w - 16, sy = p.y + 15;
-          ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+          ctx.strokeStyle = t.inkDim;
           ctx.strokeRect(sx - 3.5, sy - 3.5, 7, 7);
-          ctx.fillStyle = 'rgba(255,255,255,0.6)';
+          ctx.fillStyle = t.inkDim;
           ctx.fillRect(sx - 1, sy - 1, 2, 2);
         }
       } else if (room.type === 'boss' || room.type === 'goal') {
-        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.fillStyle = t.inkDim;
         ctx.fillRect(p.x + w / 2 - 1.5, p.y + h / 2 - 1.5, 3, 3);
       }
 
@@ -521,9 +528,9 @@
             const x = startX + i * (chip + gap);
             if (x + chip > p.x + w - pad) break;
             const itemSelected = view.selection && view.selection.type === 'item' && view.selection.id === item.id;
-            ctx.fillStyle = itemSelected ? 'rgba(255,255,255,0.16)' : 'rgba(8,8,10,0.65)';
+            ctx.fillStyle = itemSelected ? MV.hexToRgba(t.accent, 0.16) : t.itemBg;
             ctx.fillRect(x, y, chip, chip);
-            ctx.strokeStyle = itemSelected ? '#ffffff' : (item.optional ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.5)');
+            ctx.strokeStyle = itemSelected ? t.accent : (item.optional ? t.itemStrokeOptional : t.itemStroke);
             if (item.optional && !itemSelected) ctx.setLineDash([2, 2]);
             ctx.strokeRect(x + 0.5, y + 0.5, chip - 1, chip - 1);
             ctx.setLineDash([]);
@@ -532,17 +539,17 @@
           }
           if (overflow) {
             ctx.font = '7px ' + FONT_MONO;
-            ctx.fillStyle = 'rgba(255,255,255,0.55)';
+            ctx.fillStyle = t.inkDim;
             ctx.fillText('+' + (roomItems.length - visibleCount), p.x + w - pad - 12, y + 9.5);
           }
         } else if (roomItems.length) {
-          ctx.fillStyle = 'rgba(255,255,255,0.7)';
+          ctx.fillStyle = t.inkStrong;
           ctx.fillRect(p.x + w - pad - 2, p.y + h - pad - 2, 3, 3);
         }
       }
 
       if (selected) {
-        ctx.strokeStyle = '#ffffff';
+        ctx.strokeStyle = t.accent;
         ctx.lineWidth = 1.4;
         ctx.setLineDash([]);
         roundRect(ctx, p.x - 1, p.y - 1, w + 2, h + 2, 2);
@@ -550,20 +557,20 @@
         if (view.tool === 'select') {
           const hs = 5;
           [[p.x, p.y, 'nw'], [p.x + w, p.y, 'ne'], [p.x + w, p.y + h, 'se'], [p.x, p.y + h, 'sw']].forEach(hd => {
-            ctx.fillStyle = '#0b0b0c';
-            ctx.strokeStyle = '#fff';
+            ctx.fillStyle = t.bg;
+            ctx.strokeStyle = t.accent;
             ctx.lineWidth = 1;
             ctx.fillRect(hd[0] - hs / 2, hd[1] - hs / 2, hs, hs);
             ctx.strokeRect(hd[0] - hs / 2 + 0.5, hd[1] - hs / 2 + 0.5, hs - 1, hs - 1);
             lastLayout.handles.push({ id: hd[2], roomId: room.id, x: hd[0], y: hd[1] });
           });
           ctx.font = '7px ' + FONT_MONO;
-          ctx.fillStyle = '#ffffff';
+          ctx.fillStyle = t.ink;
           const sizeText = Math.round(room.w) + ' × ' + Math.round(room.h);
           ctx.fillText(sizeText, p.x, p.y + h + 12);
         }
       } else if (hover) {
-        ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+        ctx.strokeStyle = t.lineHover;
         ctx.lineWidth = 1;
         roundRect(ctx, p.x - 0.5, p.y - 0.5, w + 1, h + 1, 2);
         ctx.stroke();
@@ -589,13 +596,14 @@
 
   function drawConnectPreview(ctx, project, view, W, H) {
     if (view.tool !== 'connect' || !view.connectFrom) return;
+    const t = MV.canvasTheme();
     const room = project.rooms.find(r => r.id === view.connectFrom);
     if (!room) return;
     const a = w2s(room.x + room.w / 2, room.y + room.h / 2, view.cam, W, H);
     const b = view.pointerScreen || { x: 0, y: 0 };
     ctx.save();
     ctx.setLineDash([4, 4]);
-    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.strokeStyle = t.accent;
     ctx.lineWidth = 1.4;
     ctx.beginPath();
     ctx.moveTo(a.x, a.y);
@@ -604,30 +612,31 @@
     ctx.setLineDash([]);
     ctx.beginPath();
     ctx.arc(a.x, a.y, 5, 0, Math.PI * 2);
-    ctx.strokeStyle = '#fff';
+    ctx.strokeStyle = t.accent;
     ctx.stroke();
     ctx.font = '8px ' + FONT_MONO;
-    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.fillStyle = t.accent;
     ctx.fillText('ORIGIN', a.x + 9, a.y + 3);
     ctx.restore();
   }
 
   function drawExportFrame(ctx, project, W, H) {
+    const t = MV.canvasTheme();
     ctx.save();
-    ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+    ctx.strokeStyle = MV.hexToRgba(t.ink, 0.16);
     ctx.lineWidth = 1;
     ctx.strokeRect(28.5, 28.5, W - 57, H - 57);
-    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.strokeStyle = MV.hexToRgba(t.ink, 0.06);
     ctx.strokeRect(34.5, 34.5, W - 69, H - 69);
 
     ctx.font = '8px ' + FONT_MONO;
-    ctx.fillStyle = 'rgba(255,255,255,0.42)';
+    ctx.fillStyle = MV.hexToRgba(t.ink, 0.42);
     ctx.fillText('ROUTE FORGE / 2D ROUTE SHEET', 50, 56);
     ctx.font = '20px ' + FONT_DISPLAY;
-    ctx.fillStyle = '#f2f2f4';
+    ctx.fillStyle = t.ink;
     ctx.fillText(project.meta.title || 'UNTITLED ROUTE', 50, 82);
     ctx.font = '8px ' + FONT_MONO;
-    ctx.fillStyle = 'rgba(255,255,255,0.32)';
+    ctx.fillStyle = MV.hexToRgba(t.ink, 0.32);
     const counts = MV.projectCounts(project);
     ctx.fillText(
       counts.regions + ' REGIONS  /  ' + counts.rooms + ' ROOMS  /  ' + counts.links + ' LINKS  /  ' +
@@ -640,18 +649,19 @@
     ctx.fillText('MONOCHROME / 1:1 / ' + stamp, W - 50, H - 52);
     ctx.textAlign = 'left';
     ctx.font = '7px ' + FONT_MONO;
-    ctx.fillStyle = 'rgba(255,255,255,0.22)';
+    ctx.fillStyle = MV.hexToRgba(t.ink, 0.22);
     ctx.fillText('GENERATED BY ROUTE FORGE', 50, H - 52);
     ctx.restore();
   }
 
   function render(ctx, W, H, project, view, opts) {
     const options = opts || {};
+    const t = MV.canvasTheme();
     lastLayout = { width: W, height: H, cam: view.cam, rooms: {}, links: {}, items: {}, handles: [] };
 
     if (view.layers.grid) drawGrid(ctx, W, H, view.cam, options);
     else {
-      ctx.fillStyle = '#0b0b0c';
+      ctx.fillStyle = t.bg;
       ctx.fillRect(0, 0, W, H);
     }
 
@@ -667,7 +677,7 @@
 
     if (view.layers.path && view.analysis && view.analysis.path && view.analysis.path.length > 1) {
       ctx.save();
-      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx.strokeStyle = MV.hexToRgba(t.accent, 0.35);
       ctx.lineWidth = 1;
       ctx.setLineDash([2, 6]);
       view.analysis.path.forEach(roomId => {
@@ -683,15 +693,15 @@
       const d = view.draftRoom;
       const a = w2s(d.x, d.y, view.cam, W, H);
       ctx.save();
-      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-      ctx.fillStyle = 'rgba(255,255,255,0.06)';
+      ctx.strokeStyle = t.accent;
+      ctx.fillStyle = MV.hexToRgba(t.accent, 0.06);
       ctx.lineWidth = 1.2;
       ctx.setLineDash([5, 4]);
       ctx.fillRect(a.x, a.y, d.w * view.cam.zoom, d.h * view.cam.zoom);
       ctx.strokeRect(a.x, a.y, d.w * view.cam.zoom, d.h * view.cam.zoom);
       ctx.setLineDash([]);
       ctx.font = '8px ' + FONT_MONO;
-      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.fillStyle = t.ink;
       ctx.fillText(Math.round(d.w) + ' × ' + Math.round(d.h), a.x + 6, a.y + 12);
       ctx.restore();
     }

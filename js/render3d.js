@@ -165,21 +165,18 @@
     view.cam.pitch = Math.max(0.35, view.cam.pitch);
   }
 
-  function rgba(alpha) {
-    return 'rgba(255,255,255,' + alpha + ')';
-  }
-
   function drawBackground(ctx, W, H) {
-    ctx.fillStyle = '#09090a';
+    const t = MV.canvasTheme();
+    ctx.fillStyle = t.bg3d;
     ctx.fillRect(0, 0, W, H);
     const gradient = ctx.createRadialGradient(W * 0.5, H * 0.42, 20, W * 0.5, H * 0.42, Math.max(W, H) * 0.78);
-    gradient.addColorStop(0, 'rgba(255,255,255,0.045)');
-    gradient.addColorStop(0.5, 'rgba(255,255,255,0.008)');
+    gradient.addColorStop(0, t.bgGlow);
+    gradient.addColorStop(0.5, 'rgba(0,0,0,0)');
     gradient.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, W, H);
 
-    ctx.strokeStyle = 'rgba(255,255,255,0.02)';
+    ctx.strokeStyle = t.grid;
     ctx.lineWidth = 1;
     for (let i = 0; i < 5; i++) {
       const y = H * 0.12 + i * H * 0.18;
@@ -191,6 +188,7 @@
   }
 
   function drawPlates(ctx, project, sc) {
+    const t = MV.canvasTheme();
     const labels = [];
     (project.regions || []).forEach(region => {
       const regionRooms = (project.rooms || []).filter(room => room.region === region.id);
@@ -216,16 +214,16 @@
       ctx.beginPath();
       corners.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
       ctx.closePath();
-      ctx.fillStyle = 'rgba(255,255,255,0.014)';
+      ctx.fillStyle = t.plateFill;
       ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,0.055)';
+      ctx.strokeStyle = t.plateStroke;
       ctx.lineWidth = 1;
       ctx.setLineDash([3, 5]);
       ctx.stroke();
       ctx.setLineDash([]);
 
       if (regionElev) {
-        ctx.strokeStyle = 'rgba(255,255,255,0.045)';
+        ctx.strokeStyle = t.dropLine;
         ctx.setLineDash([2, 5]);
         ctx.beginPath();
         worldCorners.forEach(world => {
@@ -245,6 +243,7 @@
   }
 
   function drawGrid(ctx, project, sc) {
+    const t = MV.canvasTheme();
     const b = sc.bounds;
     const pad = 8;
     const minX = (b.minX - sc.center2d.x) * SCALE - pad;
@@ -254,7 +253,7 @@
     const step = 3;
     ctx.save();
     ctx.lineWidth = 1;
-    ctx.strokeStyle = 'rgba(255,255,255,0.028)';
+    ctx.strokeStyle = t.grid;
     ctx.beginPath();
     for (let x = Math.floor(minX / step) * step; x <= maxX; x += step) {
       const a = projectPoint(sc.basis, vec(x, 0, minZ));
@@ -272,7 +271,7 @@
     }
     ctx.stroke();
 
-    ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+    ctx.strokeStyle = t.gridMajor;
     const edges = [
       [vec(minX, 0, minZ), vec(maxX, 0, minZ)],
       [vec(maxX, 0, minZ), vec(maxX, 0, maxZ)],
@@ -292,6 +291,7 @@
   }
 
   function drawLinks(ctx, project, view, sc, highlightedOnly) {
+    const t = MV.canvasTheme();
     const boxes = {};
     sc.boxes.forEach(box => { boxes[box.id] = box; });
     const selection = view.selection;
@@ -310,10 +310,10 @@
       if (!pa || !pb) return;
       const gate = MV.gateById(link.gate);
       const isPath = pathSet.has(link.id);
-      let stroke = 'rgba(255,255,255,0.13)';
+      let stroke = t.line;
       let width = 1;
-      if (isPath) { stroke = 'rgba(255,255,255,0.32)'; width = 1.3; }
-      if (highlightedOnly) { stroke = 'rgba(255,255,255,0.72)'; width = 1.4; }
+      if (isPath) { stroke = MV.hexToRgba(t.accent, 0.32); width = 1.3; }
+      if (highlightedOnly) { stroke = t.accent; width = 1.4; }
       ctx.save();
       ctx.strokeStyle = stroke;
       ctx.lineWidth = width;
@@ -331,7 +331,7 @@
         ctx.save();
         ctx.translate(mx, my);
         ctx.rotate(angle);
-        ctx.fillStyle = 'rgba(255,255,255,0.55)';
+        ctx.fillStyle = t.inkDim;
         ctx.beginPath();
         ctx.moveTo(4, 0); ctx.lineTo(-3, -3); ctx.lineTo(-3, 3);
         ctx.closePath();
@@ -344,10 +344,10 @@
         const my = (pa.y + pb.y) / 2;
         ctx.font = '7px ' + FONT_MONO;
         ctx.textAlign = 'center';
-        ctx.fillStyle = 'rgba(10,10,12,0.8)';
+        ctx.fillStyle = t.labelBg;
         const tw = ctx.measureText(gate.code).width;
         ctx.fillRect(mx - tw / 2 - 3, my - 8, tw + 6, 12);
-        ctx.fillStyle = highlightedOnly ? '#fff' : 'rgba(255,255,255,0.55)';
+        ctx.fillStyle = highlightedOnly ? t.inkStrong : t.inkDim;
         ctx.fillText(gate.code, mx, my + 1);
         ctx.textAlign = 'left';
       }
@@ -356,6 +356,7 @@
   }
 
   function drawBoxes(ctx, project, view, sc) {
+    const t = MV.canvasTheme();
     const boxes = sc.boxes;
     const camPos = sc.basis.position;
     const maxPhase = Math.max(1, (view.analysis && view.analysis.stepCount ? view.analysis.stepCount - 1 : 1));
@@ -377,23 +378,17 @@
       else visible.push('z');
 
       function colorFor(face) {
-        if (!reachable) return face === 'top' ? 'rgb(24,24,28)' : (face === 'x' ? 'rgb(17,17,21)' : 'rgb(14,14,17)');
-        if (selected) return face === 'top' ? 'rgb(82,82,90)' : (face === 'x' ? 'rgb(55,55,63)' : 'rgb(46,46,53)');
-        if (hover) return face === 'top' ? 'rgb(64,64,72)' : (face === 'x' ? 'rgb(43,43,50)' : 'rgb(36,36,42)');
-        if (view.layers.phases) {
-          const t = phaseT;
-          if (face === 'top') return 'rgb(' + Math.round(46 + t * 20) + ',' + Math.round(46 + t * 20) + ',' + Math.round(51 + t * 21) + ')';
-          if (face === 'x') return 'rgb(' + Math.round(31 + t * 10) + ',' + Math.round(31 + t * 10) + ',' + Math.round(35 + t * 11) + ')';
-          return 'rgb(' + Math.round(25 + t * 8) + ',' + Math.round(25 + t * 8) + ',' + Math.round(28 + t * 9) + ')';
-        }
-        return face === 'top' ? 'rgb(54,54,60)' : (face === 'x' ? 'rgb(36,36,42)' : 'rgb(29,29,34)');
+        if (!reachable) return face === 'top' ? t.boxTopUnreachable : (face === 'x' ? t.boxXUnreachable : t.boxZUnreachable);
+        if (selected) return face === 'top' ? t.boxTopSelected : (face === 'x' ? t.boxXSelected : t.boxZSelected);
+        if (hover) return face === 'top' ? t.boxTopHover : (face === 'x' ? t.boxXHover : t.boxZHover);
+        return face === 'top' ? t.boxTop : (face === 'x' ? t.boxX : t.boxZ);
       }
 
       function strokeFor(face) {
-        if (selected) return { color: '#ffffff', width: 1.25 };
-        if (hover) return { color: 'rgba(255,255,255,0.55)', width: 1 };
-        if (!reachable) return { color: 'rgba(255,255,255,0.09)', width: 0.7 };
-        return { color: 'rgba(255,255,255,0.24)', width: 0.7 };
+        if (selected) return { color: t.accent, width: 1.25 };
+        if (hover) return { color: t.boxStrokeHover, width: 1 };
+        if (!reachable) return { color: t.boxStrokeUnreachable, width: 0.7 };
+        return { color: t.boxStroke, width: 0.7 };
       }
 
       function addFace(face, points) {
@@ -474,7 +469,7 @@
       ].map(p => projectPoint(sc.basis, p));
       if (corners.some(p => !p)) return;
       ctx.save();
-      ctx.strokeStyle = selected ? '#ffffff' : 'rgba(255,255,255,0.45)';
+      ctx.strokeStyle = selected ? t.accent : t.boxStrokeHover;
       ctx.lineWidth = selected ? 1.2 : 0.9;
       const rects = [[0, 1, 2, 3], [4, 5, 6, 7]];
       rects.forEach(indices => {
@@ -494,7 +489,7 @@
         const top = projectPoint(sc.basis, vec(box.cx, box.base, box.cz));
         if (ground && top) {
           ctx.setLineDash([3, 4]);
-          ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+          ctx.strokeStyle = t.dropLine;
           ctx.beginPath();
           ctx.moveTo(top.x, top.y);
           ctx.lineTo(ground.x, ground.y);
@@ -509,6 +504,7 @@
   }
 
   function drawItems(ctx, project, view, sc) {
+    const t = MV.canvasTheme();
     const boxes = {};
     sc.boxes.forEach(box => { boxes[box.id] = box; });
     const byRoom = {};
@@ -523,14 +519,14 @@
       ctx.save();
       ctx.translate(p.x, p.y);
       ctx.rotate(Math.PI / 4);
-      ctx.strokeStyle = selected ? '#ffffff' : 'rgba(255,255,255,0.55)';
+      ctx.strokeStyle = selected ? t.accent : t.inkDim;
       ctx.lineWidth = 1;
       ctx.strokeRect(-2.5, -2.5, 5, 5);
       ctx.restore();
       if (selected && items.length) {
         ctx.save();
         ctx.font = '7px ' + FONT_MONO;
-        ctx.fillStyle = 'rgba(255,255,255,0.72)';
+        ctx.fillStyle = t.inkDim;
         ctx.textAlign = 'center';
         ctx.fillText(items.length + ' ITEM' + (items.length > 1 ? 'S' : ''), p.x, p.y - 9);
         ctx.textAlign = 'left';
@@ -541,6 +537,7 @@
 
   function drawRoomLabels(ctx, project, view, sc) {
     if (!view.layers.names) return;
+    const t = MV.canvasTheme();
     const near = view.cam.dist < 27;
     sc.boxes.forEach(box => {
       const selected = view.selection && view.selection.type === 'room' && view.selection.id === box.id;
@@ -559,22 +556,22 @@
         const kicker = (region ? region.code : 'ZONE') + ' / ' + MV.roomTypeById(box.room.type).code;
         const kw = ctx.measureText(kicker).width;
         const width = Math.max(tw, kw) + pad * 2 + 2;
-        ctx.fillStyle = 'rgba(10,10,12,0.92)';
+        ctx.fillStyle = t.threeLabelBg;
         ctx.fillRect(p.x - width / 2, p.y - 30, width, 28);
-        ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+        ctx.strokeStyle = t.threeLabelStroke;
         ctx.strokeRect(p.x - width / 2 + 0.5, p.y - 29.5, width - 1, 27);
         ctx.font = '7px ' + FONT_MONO;
-        ctx.fillStyle = 'rgba(255,255,255,0.45)';
+        ctx.fillStyle = t.threeLabelInkDim;
         ctx.textAlign = 'center';
         ctx.fillText(kicker, p.x, p.y - 20);
         ctx.font = '10px ' + FONT_UI;
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = t.threeLabelInk;
         ctx.fillText(name, p.x, p.y - 8);
         ctx.textAlign = 'left';
       } else if (near || hover) {
-        ctx.fillStyle = 'rgba(10,10,12,0.72)';
+        ctx.fillStyle = t.threeLabelBg;
         ctx.fillRect(p.x - tw / 2 - pad, p.y - 12, tw + pad * 2, 11);
-        ctx.fillStyle = hover ? '#ffffff' : 'rgba(255,255,255,0.7)';
+        ctx.fillStyle = hover ? t.threeLabelInk : t.threeLabelInkDim;
         ctx.textAlign = 'center';
         ctx.fillText(name, p.x, p.y - 4);
         ctx.textAlign = 'left';
@@ -590,7 +587,7 @@
         if (p) {
           ctx.save();
           ctx.font = '7px ' + FONT_MONO;
-          ctx.fillStyle = 'rgba(255,255,255,0.45)';
+          ctx.fillStyle = t.threeLabelInkDim;
           ctx.textAlign = 'center';
           ctx.fillText('H ' + Math.round(box.room.height) + '  /  E ' + Math.round(box.room.elev) + '  /  D ' + Math.round(box.room.depth), p.x, p.y + 18);
           ctx.textAlign = 'left';
@@ -601,6 +598,7 @@
   }
 
   function drawRegionLabels(ctx, project, sc, labels) {
+    const t = MV.canvasTheme();
     (labels || []).forEach(entry => {
       const p = entry.point;
       if (p.x < -100 || p.x > sc.W + 100 || p.y < -60 || p.y > sc.H + 60) return;
@@ -612,14 +610,14 @@
       const cw = ctx.measureText(count).width;
       const width = Math.max(tw, cw) + 14;
       const height = 25;
-      ctx.fillStyle = 'rgba(8,8,10,0.78)';
+      ctx.fillStyle = t.threeLabelBg;
       ctx.fillRect(p.x + 4, p.y - 17, width, height);
-      ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+      ctx.strokeStyle = t.threeLabelStroke;
       ctx.strokeRect(p.x + 4.5, p.y - 16.5, width - 1, height - 1);
-      ctx.fillStyle = 'rgba(255,255,255,0.86)';
+      ctx.fillStyle = t.threeLabelInk;
       ctx.fillText(title, p.x + 11, p.y - 6);
       ctx.font = '6.5px ' + FONT_MONO;
-      ctx.fillStyle = 'rgba(255,255,255,0.38)';
+      ctx.fillStyle = t.threeLabelInkDim;
       ctx.fillText(count, p.x + 11, p.y + 3);
       ctx.restore();
     });
@@ -627,6 +625,7 @@
 
   function drawSelectionInfo(ctx, project, view, sc) {
     if (!view.selection || view.selection.type !== 'room') return;
+    const t = MV.canvasTheme();
     const box = sc.boxes.find(b => b.id === view.selection.id);
     if (!box) return;
     const room = box.room;
@@ -643,11 +642,11 @@
     ctx.font = '8px ' + FONT_UI;
     const width = Math.max.apply(null, lines.map(line => ctx.measureText(line).width)) + 14;
     const height = lines.length * 11 + 8;
-    ctx.fillStyle = 'rgba(10,10,12,0.86)';
+    ctx.fillStyle = t.infoBg;
     ctx.fillRect(p.x - width / 2, p.y - height, width, height);
-    ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+    ctx.strokeStyle = t.infoStroke;
     ctx.strokeRect(p.x - width / 2 + 0.5, p.y - height + 0.5, width - 1, height - 1);
-    ctx.fillStyle = 'rgba(255,255,255,0.72)';
+    ctx.fillStyle = t.infoInk;
     ctx.textAlign = 'center';
     lines.forEach((line, i) => ctx.fillText(line, p.x, p.y - height + 12 + i * 11));
     ctx.textAlign = 'left';

@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="ROUTE FORGE — 面向银河城游戏的 2D 路线与 3D 体块关卡设计器">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230a0a0b'/%3E%3Crect x='6.5' y='6.5' width='19' height='19' fill='none' stroke='%23ffffff'/%3E%3Cpath d='M11 21 21 11' stroke='%23ffffff'/%3E%3C/svg%3E">
+<script>
+  try {
+    var _rfUI = JSON.parse(localStorage.getItem('routeforge.ui.v1') || '{}');
+    document.documentElement.dataset.theme = _rfUI.theme === 'light' ? 'light' : 'dark';
+  } catch (e) {
+    document.documentElement.dataset.theme = 'dark';
+  }
+</script>
 <title>ROUTE FORGE — 银河城关卡路线设计器</title>
 <link rel="stylesheet" href="css/app.css">
 </head>
@@ -57,6 +65,10 @@
       <button id="presetBtn" class="btn btn-ghost">
         <svg viewBox="0 0 20 20"><path d="m10 2.8 3 3-3 3-3-3zM5.5 10.2l2.6 2.6-2.6 2.6-2.6-2.6zM14.5 10.2l2.6 2.6-2.6 2.6-2.6-2.6z"/></svg>
         预设
+      </button>
+      <button id="themeBtn" class="icon-btn theme-btn" title="切换白天 / 黑夜" aria-label="切换主题">
+        <svg class="theme-icon-sun" viewBox="0 0 20 20"><circle cx="10" cy="10" r="3.6"/><path d="M10 2v2.2M10 15.8V18M2 10h2.2M15.8 10H18M4.3 4.3l1.6 1.6M14.1 14.1l1.6 1.6M15.7 4.3l-1.6 1.6M5.9 14.1l-1.6 1.6"/></svg>
+        <svg class="theme-icon-moon" viewBox="0 0 20 20"><path d="M15.8 12.6A6.3 6.3 0 0 1 7.4 4.2 6.4 6.4 0 1 0 15.8 12.6z"/></svg>
       </button>
       <button id="helpBtn" class="icon-btn help-btn" title="快捷键与说明" aria-label="帮助">?</button>
     </div>

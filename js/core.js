@@ -68,6 +68,190 @@
   const ROOM_MIN_W = 56;
   const ROOM_MIN_H = 36;
 
+  /* Canvas palettes. CSS handles the DOM chrome; renderers read these tokens. */
+  const CANVAS_THEMES = {
+    dark: {
+      name: 'dark',
+      bg: '#0b0b0c',
+      bg3d: '#09090a',
+      bgGlow: 'rgba(255,255,255,0.028)',
+      grid: 'rgba(255,255,255,0.032)',
+      gridMajor: 'rgba(255,255,255,0.062)',
+      ink: '#f1f1f3',
+      inkStrong: '#ffffff',
+      inkDim: '#8a8a91',
+      inkFaint: '#5c5c63',
+      inkGhost: '#4d4d53',
+      line: '#3d3d44',
+      lineDim: '#303036',
+      lineHover: '#b7b7bd',
+      lineSelected: '#ffffff',
+      gateBg: '#0d0d0f',
+      gateStroke: '#55555c',
+      gateStrokeLocked: '#3b3b41',
+      gateInk: '#b9b9c0',
+      gateInkLocked: '#6a6a71',
+      gateInkSelected: '#09090a',
+      gateBgSelected: '#ededf0',
+      roomFill: '#151518',
+      roomHover: '#1b1b20',
+      roomSelected: '#242429',
+      roomUnreachable: 'rgba(255,255,255,0.008)',
+      roomBorder: 'rgba(255,255,255,0.26)',
+      roomBorderUnreachable: '#39393f',
+      roomInk: '#dedee1',
+      roomInkDim: '#5d5d63',
+      roomKicker: 'rgba(255,255,255,0.38)',
+      roomKickerDim: '#4d4d53',
+      hatch: 'rgba(255,255,255,0.035)',
+      labelBg: 'rgba(8,8,10,0.78)',
+      labelBgSoft: 'rgba(8,8,10,0.72)',
+      labelStroke: 'rgba(255,255,255,0.1)',
+      labelInk: '#d3d3d7',
+      labelInkDim: '#77777e',
+      itemBg: 'rgba(8,8,10,0.65)',
+      itemStroke: 'rgba(255,255,255,0.5)',
+      itemStrokeOptional: 'rgba(255,255,255,0.25)',
+      itemGlyph: '#e4e4e7',
+      itemGlyphDim: '#aaaab0',
+      accent: '#ffffff',
+      accentInk: '#0a0a0b',
+      accentGlow: 'rgba(255,255,255,0.55)',
+      shadow: 'rgba(0,0,0,0.55)',
+      boxTop: 'rgb(54,54,60)',
+      boxX: 'rgb(36,36,42)',
+      boxZ: 'rgb(29,29,34)',
+      boxTopSelected: 'rgb(82,82,90)',
+      boxXSelected: 'rgb(55,55,63)',
+      boxZSelected: 'rgb(46,46,53)',
+      boxTopHover: 'rgb(64,64,72)',
+      boxXHover: 'rgb(43,43,50)',
+      boxZHover: 'rgb(36,36,42)',
+      boxTopUnreachable: 'rgb(24,24,28)',
+      boxXUnreachable: 'rgb(17,17,21)',
+      boxZUnreachable: 'rgb(14,14,17)',
+      boxStroke: 'rgba(255,255,255,0.24)',
+      boxStrokeHover: 'rgba(255,255,255,0.55)',
+      boxStrokeUnreachable: 'rgba(255,255,255,0.09)',
+      plateFill: 'rgba(255,255,255,0.014)',
+      plateStroke: 'rgba(255,255,255,0.055)',
+      dropLine: 'rgba(255,255,255,0.045)',
+      threeLabelBg: 'rgba(8,8,10,0.78)',
+      threeLabelStroke: 'rgba(255,255,255,0.12)',
+      threeLabelInk: 'rgba(255,255,255,0.86)',
+      threeLabelInkDim: 'rgba(255,255,255,0.38)',
+      infoBg: 'rgba(10,10,12,0.86)',
+      infoStroke: 'rgba(255,255,255,0.16)',
+      infoInk: 'rgba(255,255,255,0.72)',
+      corridor: 'rgba(255,255,255,0.18)',
+      corridorStroke: 'rgba(255,255,255,0.32)'
+    },
+    light: {
+      name: 'light',
+      bg: '#eeeeeb',
+      bg3d: '#f4f4f1',
+      bgGlow: 'rgba(0,0,0,0.018)',
+      grid: 'rgba(0,0,0,0.045)',
+      gridMajor: 'rgba(0,0,0,0.085)',
+      ink: '#181816',
+      inkStrong: '#050504',
+      inkDim: '#5d5d59',
+      inkFaint: '#8b8b85',
+      inkGhost: '#b2b2ab',
+      line: '#77776f',
+      lineDim: '#b0b0a8',
+      lineHover: '#33332f',
+      lineSelected: '#050504',
+      gateBg: '#fbfbf8',
+      gateStroke: '#7f7f78',
+      gateStrokeLocked: '#bdbdb6',
+      gateInk: '#3b3b37',
+      gateInkLocked: '#92928b',
+      gateInkSelected: '#ffffff',
+      gateBgSelected: '#181816',
+      roomFill: '#fbfbf8',
+      roomHover: '#efefe9',
+      roomSelected: '#dcdcd5',
+      roomUnreachable: 'rgba(0,0,0,0.015)',
+      roomBorder: 'rgba(0,0,0,0.42)',
+      roomBorderUnreachable: '#c0c0b9',
+      roomInk: '#20201d',
+      roomInkDim: '#989891',
+      roomKicker: 'rgba(0,0,0,0.45)',
+      roomKickerDim: '#b0b0a9',
+      hatch: 'rgba(0,0,0,0.045)',
+      labelBg: 'rgba(251,251,248,0.9)',
+      labelBgSoft: 'rgba(251,251,248,0.86)',
+      labelStroke: 'rgba(0,0,0,0.13)',
+      labelInk: '#242420',
+      labelInkDim: '#85857e',
+      itemBg: 'rgba(251,251,248,0.85)',
+      itemStroke: 'rgba(0,0,0,0.43)',
+      itemStrokeOptional: 'rgba(0,0,0,0.2)',
+      itemGlyph: '#242420',
+      itemGlyphDim: '#6b6b65',
+      accent: '#121210',
+      accentInk: '#ffffff',
+      accentGlow: 'rgba(0,0,0,0.4)',
+      shadow: 'rgba(0,0,0,0.18)',
+      boxTop: 'rgb(208,208,201)',
+      boxX: 'rgb(185,185,178)',
+      boxZ: 'rgb(172,172,165)',
+      boxTopSelected: 'rgb(64,64,60)',
+      boxXSelected: 'rgb(48,48,45)',
+      boxZSelected: 'rgb(40,40,37)',
+      boxTopHover: 'rgb(188,188,181)',
+      boxXHover: 'rgb(164,164,157)',
+      boxZHover: 'rgb(150,150,143)',
+      boxTopUnreachable: 'rgb(235,235,230)',
+      boxXUnreachable: 'rgb(228,228,223)',
+      boxZUnreachable: 'rgb(222,222,217)',
+      boxStroke: 'rgba(0,0,0,0.42)',
+      boxStrokeHover: 'rgba(0,0,0,0.7)',
+      boxStrokeUnreachable: 'rgba(0,0,0,0.12)',
+      plateFill: 'rgba(0,0,0,0.02)',
+      plateStroke: 'rgba(0,0,0,0.14)',
+      dropLine: 'rgba(0,0,0,0.08)',
+      threeLabelBg: 'rgba(251,251,248,0.9)',
+      threeLabelStroke: 'rgba(0,0,0,0.14)',
+      threeLabelInk: 'rgba(0,0,0,0.84)',
+      threeLabelInkDim: 'rgba(0,0,0,0.42)',
+      infoBg: 'rgba(251,251,248,0.94)',
+      infoStroke: 'rgba(0,0,0,0.16)',
+      infoInk: 'rgba(0,0,0,0.7)',
+      corridor: 'rgba(0,0,0,0.2)',
+      corridorStroke: 'rgba(0,0,0,0.36)'
+    }
+  };
+
+  let activeThemeName = 'dark';
+
+  function setCanvasTheme(name) {
+    activeThemeName = name === 'light' ? 'light' : 'dark';
+  }
+  function canvasTheme(name) {
+    return CANVAS_THEMES[name || activeThemeName] || CANVAS_THEMES.dark;
+  }
+  function hexToRgba(hex, alpha) {
+    const value = String(hex || '').replace('#', '');
+    if (value.length !== 3 && value.length !== 6) return 'rgba(0,0,0,' + alpha + ')';
+    const parts = value.length === 3
+      ? value.split('').map(c => parseInt(c + c, 16))
+      : [parseInt(value.slice(0, 2), 16), parseInt(value.slice(2, 4), 16), parseInt(value.slice(4, 6), 16)];
+    return 'rgba(' + parts[0] + ',' + parts[1] + ',' + parts[2] + ',' + alpha + ')';
+  }
+  function blendHex(a, b, t) {
+    const parse = hex => {
+      const value = String(hex || '').replace('#', '');
+      if (value.length !== 6) return null;
+      return [parseInt(value.slice(0, 2), 16), parseInt(value.slice(2, 4), 16), parseInt(value.slice(4, 6), 16)];
+    };
+    const ca = parse(a), cb = parse(b);
+    if (!ca || !cb) return a;
+    const k = Math.max(0, Math.min(1, t));
+    return '#' + ca.map((v, i) => Math.round(v + (cb[i] - v) * k).toString(16).padStart(2, '0')).join('');
+  }
+
   /* ---------------- utilities ---------------- */
   function uid(prefix) {
     return (prefix || 'id') + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
@@ -401,6 +585,7 @@
     ROOM_TYPES,
     GATE_TYPES,
     ITEM_KINDS,
+    CANVAS_THEMES,
     ROOM_MIN_W,
     ROOM_MIN_H,
     uid,
@@ -427,6 +612,10 @@
     saveProject,
     loadUI,
     saveUI,
+    setCanvasTheme,
+    canvasTheme,
+    hexToRgba,
+    blendHex,
     History
   });
 })(window);
