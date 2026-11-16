@@ -180,6 +180,7 @@
   function drawRegionLabels(ctx, project, view, W, H) {
     const regions = project.regions || [];
     const rooms = project.rooms || [];
+    const placed = [];
     regions.forEach(region => {
       const regionRooms = rooms.filter(room => room.region === region.id);
       if (!regionRooms.length) return;
@@ -193,26 +194,59 @@
       const p = w2s(minX, minY, view.cam, W, H);
       if (p.x > W + 40 || p.y > H + 40 || w2s(maxX, maxY, view.cam, W, H).x < -40) return;
       const tone = MV.regionTone(region.tone);
-      const alpha = 0.56;
       ctx.save();
-      ctx.globalAlpha = alpha;
+      ctx.globalAlpha = 0.96;
+      ctx.font = '9px ' + FONT_MONO;
+      const codeWidth = ctx.measureText(region.code).width;
+      ctx.font = '10px ' + FONT_UI;
+      const label = truncate(ctx, region.name, 150);
+      const labelWidth = ctx.measureText(label).width;
+      const countText = String(regionRooms.length).padStart(2, '0');
+      const totalWidth = 7 + codeWidth + 7 + labelWidth + 8 + 16 + 7;
+      const left = p.x - 4;
+      let top = p.y - 27;
+      let rect = { x: left, y: top, w: totalWidth, h: 20 };
+      let tries = 0;
+      while (placed.some(other => (
+        rect.x < other.x + other.w && rect.x + rect.w > other.x &&
+        rect.y < other.y + other.h && rect.y + rect.h > other.y
+      )) && tries < 4) {
+        top -= 22;
+        rect.y = top;
+        tries++;
+      }
+      top = Math.max(4, top);
+      rect.y = top;
+      placed.push(rect);
+
+      if (tries) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+        ctx.beginPath();
+        ctx.moveTo(left + 4, top + 20);
+        ctx.lineTo(p.x + 4, p.y - 5);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = 'rgba(8,8,10,0.78)';
+      ctx.fillRect(left, top, totalWidth, 20);
+      ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+      ctx.strokeRect(left + 0.5, top + 0.5, totalWidth - 1, 19);
       ctx.fillStyle = tone.color;
-      ctx.fillRect(p.x - 1, p.y - 20, 2, 12);
+      ctx.fillRect(left, top, 2, 20);
       ctx.font = '9px ' + FONT_MONO;
       ctx.fillStyle = '#8a8a91';
-      ctx.fillText(region.code, p.x + 7, p.y - 13);
+      ctx.fillText(region.code, p.x + 3, top + 14);
       ctx.font = '10px ' + FONT_UI;
-      ctx.fillStyle = '#b9b9bf';
-      const label = truncate(ctx, region.name, 150);
-      ctx.fillText(label, p.x + 34, p.y - 13);
+      ctx.fillStyle = '#d3d3d7';
+      ctx.fillText(label, p.x + 3 + codeWidth + 7, top + 14);
       ctx.font = '8px ' + FONT_MONO;
-      ctx.fillStyle = '#5f5f66';
-      ctx.fillText(String(regionRooms.length).padStart(2, '0'), p.x + 37 + Math.min(150, ctx.measureText(label).width), p.y - 13);
-      ctx.strokeStyle = hexToRgba(tone.color, 0.16);
+      ctx.fillStyle = '#77777e';
+      ctx.fillText(countText, p.x + 3 + codeWidth + 7 + labelWidth + 8, top + 14);
+      ctx.strokeStyle = hexToRgba(tone.color, 0.18);
       ctx.setLineDash([3, 5]);
       ctx.beginPath();
-      ctx.moveTo(p.x, p.y - 5);
-      ctx.lineTo(w2s(maxX, minY, view.cam, W, H).x, p.y - 5);
+      ctx.moveTo(p.x, p.y - 4.5);
+      ctx.lineTo(w2s(maxX, minY, view.cam, W, H).x, p.y - 4.5);
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.restore();
@@ -278,6 +312,7 @@
       const gate = MV.gateById(link.gate);
       const selected = view.selection && view.selection.type === 'link' && view.selection.id === link.id;
       const hover = view.hover && view.hover.type === 'link' && view.hover.id === link.id;
+      if (view.cam.zoom < 0.7 && !selected && !hover && entry.open) return;
       const bw = 22, bh = 14;
       const x = entry.badge.x - bw / 2, y = entry.badge.y - bh / 2;
       ctx.save();
@@ -388,6 +423,10 @@
       const phase = analysis && analysis.roomPhase ? analysis.roomPhase[room.id] : 0;
       const reachable = analysis ? analysis.reachable.includes(room.id) : true;
       const phaseT = phase === undefined ? 0 : MV.clamp(phase / maxPhase, 0, 1);
+      const important = selected || hover || ['hub', 'boss', 'start', 'goal'].includes(room.type);
+      const detail = view.cam.zoom >= 0.44 || important;
+      const compact = detail && !important && view.cam.zoom < 0.72;
+      const showItems = view.cam.zoom >= 0.72 || selected || hover;
 
       let fill = '#151518';
       if (view.layers.phases && analysis && phase !== undefined) {
@@ -431,37 +470,44 @@
 
       const pad = 7;
       const type = MV.roomTypeById(room.type);
-      ctx.font = '7.5px ' + FONT_MONO;
-      ctx.fillStyle = selected ? '#d8d8dc' : (reachable ? 'rgba(255,255,255,0.38)' : '#4d4d53');
-      ctx.fillText(type.code, p.x + pad, p.y + 11);
+      if (detail) {
+        if (!compact) {
+          ctx.font = '7.5px ' + FONT_MONO;
+          ctx.fillStyle = selected ? '#d8d8dc' : (reachable ? 'rgba(255,255,255,0.38)' : '#4d4d53');
+          ctx.fillText(type.code, p.x + pad, p.y + 11);
+        }
 
-      if (view.layers.names && h > 20) {
-        ctx.font = (w < 100 ? '10px ' : '11.5px ') + FONT_UI;
-        ctx.fillStyle = reachable ? (selected ? '#ffffff' : '#dedee1') : '#5d5d63';
-        const nameY = p.y + 25;
-        const maxText = Math.max(20, w - pad * 2 - (w > 130 ? 12 : 0));
-        ctx.fillText(truncate(ctx, room.name, maxText), p.x + pad, nameY);
-      }
+        if (view.layers.names && h > 18) {
+          ctx.font = (compact ? '9px ' : (w < 100 ? '10px ' : '11.5px ')) + FONT_UI;
+          ctx.fillStyle = reachable ? (selected ? '#ffffff' : '#dedee1') : '#5d5d63';
+          const nameY = compact ? p.y + 16 : p.y + 25;
+          const maxText = Math.max(20, w - pad * 2 - (w > 130 && !compact ? 12 : 0));
+          ctx.fillText(truncate(ctx, room.name, maxText), p.x + pad, nameY);
+        }
 
-      if (w > 70 && h > 44) {
-        ctx.font = '7px ' + FONT_MONO;
-        ctx.fillStyle = 'rgba(255,255,255,0.2)';
-        ctx.textAlign = 'right';
-        ctx.fillText(region ? region.code : '', p.x + w - pad, p.y + 11);
-        ctx.textAlign = 'left';
-      }
+        if (!compact && w > 70 && h > 44) {
+          ctx.font = '7px ' + FONT_MONO;
+          ctx.fillStyle = 'rgba(255,255,255,0.2)';
+          ctx.textAlign = 'right';
+          ctx.fillText(region ? region.code : '', p.x + w - pad, p.y + 11);
+          ctx.textAlign = 'left';
+        }
 
-      if (room.type === 'save' && w > 44) {
-        const sx = p.x + w - 16, sy = p.y + 15;
-        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-        ctx.strokeRect(sx - 3.5, sy - 3.5, 7, 7);
-        ctx.fillStyle = 'rgba(255,255,255,0.6)';
-        ctx.fillRect(sx - 1, sy - 1, 2, 2);
+        if (!compact && room.type === 'save' && w > 44) {
+          const sx = p.x + w - 16, sy = p.y + 15;
+          ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+          ctx.strokeRect(sx - 3.5, sy - 3.5, 7, 7);
+          ctx.fillStyle = 'rgba(255,255,255,0.6)';
+          ctx.fillRect(sx - 1, sy - 1, 2, 2);
+        }
+      } else if (room.type === 'boss' || room.type === 'goal') {
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.fillRect(p.x + w / 2 - 1.5, p.y + h / 2 - 1.5, 3, 3);
       }
 
       if (view.layers.items) {
         const roomItems = project.items.filter(item => item.room === room.id);
-        if (roomItems.length) {
+        if (roomItems.length && showItems) {
           const chip = 13, gap = 3;
           const maxChips = Math.max(0, Math.floor((w - pad * 2 + gap) / (chip + gap)));
           let visibleCount = Math.min(roomItems.length, maxChips);
@@ -489,6 +535,9 @@
             ctx.fillStyle = 'rgba(255,255,255,0.55)';
             ctx.fillText('+' + (roomItems.length - visibleCount), p.x + w - pad - 12, y + 9.5);
           }
+        } else if (roomItems.length) {
+          ctx.fillStyle = 'rgba(255,255,255,0.7)';
+          ctx.fillRect(p.x + w - pad - 2, p.y + h - pad - 2, 3, 3);
         }
       }
 

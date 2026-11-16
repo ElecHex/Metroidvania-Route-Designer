@@ -108,6 +108,7 @@
     if (['select', 'room', 'connect', 'item', 'pan'].includes(savedUI.tool)) app.tool = savedUI.tool;
 
     let project = MV.loadProject();
+    const loadedFromStorage = !!project;
     if (!project) {
       try {
         project = MV.PRESETS[0].build();
@@ -117,12 +118,15 @@
       }
     }
     app.project = MV.normalizeProject(project);
+    app.lastSaved = loadedFromStorage ? (app.project.meta.updated || 0) : 0;
     app.currentRegion = (app.project.regions.find(r => r.id === savedUI.currentRegion) || app.project.regions[0]).id;
     app.analysis = MV.analyze(app.project);
 
     const cam2 = savedUI.cam2d && typeof savedUI.cam2d.zoom === 'number' ? savedUI.cam2d : null;
+    const initialW = canvasW(els.canvas2d);
+    const initialH = canvasH(els.canvas2d);
     app.view2d = {
-      cam: cam2 || MV.Render2D.fitCamera(app.project, canvasW(els.canvas2d), canvasH(els.canvas2d), 100),
+      cam: cam2 || MV.Render2D.fitCamera(app.project, initialW, initialH, initialW < 700 ? 44 : 100),
       layers: app.layers,
       selection: null,
       hover: null,
@@ -141,6 +145,7 @@
       hover: null,
       analysis: app.analysis
     };
+    app.fitted3d = !!cam3;
 
     bindUI();
     applyModeUI();
@@ -153,7 +158,7 @@
     ro.observe(els.stage3d);
     window.addEventListener('resize', scheduleRender);
     requestAnimationFrame(() => {
-      if (app.mode === '3d') fit3D();
+      if (app.mode === '3d' && !app.fitted3d) fit3D();
       scheduleRender();
     });
   }
@@ -597,8 +602,9 @@
           <label class="field"><span>代号</span><input data-field="code" value="${esc(region.code)}" maxlength="6"></label>
           <label class="field"><span>灰度色调</span><select data-field="tone">${MV.REGION_TONES.map(t => `<option value="${t.id}" ${t.id === region.tone ? 'selected' : ''}>TONE ${t.id} / ${t.color}</option>`).join('')}</select></label>
         </div>
+        ${numberField('3D 基座高度', 'elev', region.elev, 10)}
       </div>
-      <p class="hint-line">区域用于给房间分组、着色和统计。新增房间会放入当前选中的区域。</p>
+      <p class="hint-line">区域用于给房间分组、着色和统计。新增房间会放入当前选中的区域。基座高度只影响 3D 视图，可把不同区域叠成不同楼层。</p>
       <div class="btn-row">
         <button class="btn" data-action="set-current-region">设为当前区域</button>
         <button class="btn" data-action="focus-region">聚焦区域</button>
@@ -621,6 +627,7 @@
         <div class="stat-cell"><div class="s-label">ITEMS</div><div class="s-value">${counts.items}</div><div class="s-sub">${counts.optional} 个可选 / ${counts.bosses} 个 Boss</div></div>
       </div>
       <div class="form-grid">
+        <label class="field"><span>项目标题</span><input data-field="title" value="${esc(app.project.meta.title || '未命名路线')}"></label>
         <div class="form-grid two">
           <label class="field"><span>起点房间</span><select data-field="startRoom">${app.project.rooms.map(r => `<option value="${esc(r.id)}" ${r.id === app.project.startRoom ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select></label>
           <label class="field"><span>终点房间</span><select data-field="goalRoom">${app.project.rooms.map(r => `<option value="${esc(r.id)}" ${r.id === app.project.goalRoom ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select></label>
@@ -668,6 +675,7 @@
     if (!applyField(field, target.value, target)) return;
     markDirty();
     app.analysis = MV.analyze(app.project);
+    updateHeader();
     updateStatus();
     renderRegionList();
     scheduleRender();
@@ -699,6 +707,7 @@
   function applyField(field, value, target) {
     const sel = app.selection;
     if (!sel) {
+      if (field === 'title') { app.project.meta.title = value || '未命名路线'; return true; }
       if (field === 'startRoom') { app.project.startRoom = value; return true; }
       if (field === 'goalRoom') { app.project.goalRoom = value; return true; }
       if (field === 'notes') { app.project.meta.notes = value; return true; }
@@ -776,6 +785,7 @@
       if (field === 'name') { region.name = value || '未命名区域'; return true; }
       if (field === 'code') { region.code = String(value || 'ZONE').toUpperCase().slice(0, 6); return true; }
       if (field === 'tone') { region.tone = MV.clamp(Number(value) || 0, 0, MV.REGION_TONES.length - 1); return true; }
+      if (field === 'elev') { region.elev = MV.clamp(Number(value) || 0, -500, 500); return true; }
       return false;
     }
     return false;
@@ -917,8 +927,19 @@
         ['Hollow Knight Wiki', 'https://hollowknight.wiki/']
       ];
     const gateRows = MV.GATE_TYPES.filter(g => g.id !== 'open').map(g => {
+      const mp1Names = {
+        missile: '导弹', iceBeam: '冰冻光束', waveBeam: '波导光束', plasmaBeam: '等离子光束',
+        morphBall: '变形球', bomb: '变形球炸弹', boostBall: '加速球', spiderBall: '蜘蛛球',
+        grappleBeam: '抓钩光束', powerBomb: '强力炸弹', scanVisor: '扫描视镜',
+        thermalVisor: '热能视镜', xRayVisor: 'X 光视镜', variaSuit: '瓦利亚服',
+        gravitySuit: '重力服', phazonSuit: 'Phazon 服'
+      };
+      const reqName = id => {
+        const found = MV.abilityName(app.project, id);
+        return found === id ? (mp1Names[id] || id) : found;
+      };
       const reqs = g.requires.length
-        ? g.requires.map(id => MV.abilityName(app.project, id)).join(' + ')
+        ? g.requires.map(reqName).join(' + ')
         : (g.keyReq ? g.keyReq + ' 把钥匙' : '无 / 自定义');
       return `<tr><td>${g.code} · ${g.name}</td><td>${esc(reqs)}</td><td>${esc(g.desc)}</td></tr>`;
     }).join('');
@@ -1345,6 +1366,8 @@
   function switchMode(mode) {
     if (app.mode === mode) return;
     app.mode = mode;
+    app.hover = null;
+    hideTooltip();
     applyModeUI();
     requestAnimationFrame(() => {
       if (mode === '2d' && !app.fitted2d) fit2D();
@@ -1382,7 +1405,7 @@
       app.fitted2d = false;
       return;
     }
-    app.view2d.cam = MV.Render2D.fitCamera(app.project, W, H, 100);
+    app.view2d.cam = MV.Render2D.fitCamera(app.project, W, H, W < 700 ? 44 : 100);
     app.fitted2d = true;
     scheduleRender();
     updateStatusZoom();
@@ -1482,7 +1505,7 @@
       updateStatusZoom();
     } else {
       switchMode('2d');
-      setTimeout(() => focusRegion(regionId), 30);
+      requestAnimationFrame(() => focusRegion(regionId));
       return;
     }
     persistUI();
@@ -1617,18 +1640,12 @@
     const room = MV.findRoom(app.project, hit.id);
     if (!room) return;
     select('room', hit.id);
-    const scene = MV.Render3D.getLastScene();
-    const box = scene ? scene.boxes.find(b => b.id === room.id) : null;
-    const planeY = box ? box.base : (room.elev * 0.045);
-    const point = MV.Render3D.groundPoint(app.project, app.view3d, W, H, pos.x, pos.y, planeY);
     app.drag = {
       kind: 'move3d', roomId: room.id, canvas,
-      planeY: planeY,
-      offsetX: point ? point.x - room.x : 0,
-      offsetY: point ? point.y - room.y : 0,
       historyPushed: false, moved: false,
       shift: e.shiftKey,
       startX: pos.x, startY: pos.y,
+      startRoomX: room.x, startRoomY: room.y,
       startElev: room.elev
     };
     canvas.setPointerCapture(e.pointerId);
@@ -1736,11 +1753,16 @@
           const dy = pos.y - drag.startY;
           room.elev = MV.clamp(snap(drag.startElev - dy * 0.8, 2), -300, 300);
         } else {
-          const point = MV.Render3D.groundPoint(app.project, app.view3d, W, H, pos.x, pos.y, drag.planeY);
-          if (point) {
-            room.x = snap(point.x - drag.offsetX, 10);
-            room.y = snap(point.y - drag.offsetY, 10);
-          }
+          const dist = app.view3d.cam.dist;
+          const worldPerPixel = 2 * dist * Math.tan(25 * Math.PI / 180) / H;
+          const projectPerPixel = worldPerPixel / MV.Render3D.SCALE;
+          const yaw = app.view3d.cam.yaw;
+          const right = { x: Math.cos(yaw), z: -Math.sin(yaw) };
+          const forward = { x: -Math.sin(yaw), z: -Math.cos(yaw) };
+          const dx = pos.x - drag.startX;
+          const dy = pos.y - drag.startY;
+          room.x = snap(drag.startRoomX + (dx * right.x - dy * forward.x) * projectPerPixel, 10);
+          room.y = snap(drag.startRoomY + (dx * right.z - dy * forward.z) * projectPerPixel, 10);
         }
         drag.moved = true;
         scheduleRender();
@@ -2110,6 +2132,7 @@
       ['空格 + 拖动 / 中键', '平移画布'],
       ['滚轮', '缩放 2D / 拉近 3D'],
       ['右键拖动（3D）', '旋转相机'],
+      ['中键拖动（3D）', '平移相机'],
       ['Shift + 拖动（3D）', '调整房间基座高度'],
       ['F', '聚焦当前选择'],
       ['Delete', '删除当前选择'],
@@ -2280,6 +2303,20 @@
      misc helpers
      ============================================================ */
   function esc(value) { return MV.escapeHtml(value); }
+
+  /* small read-only inspection API for automation / debugging */
+  global.RouteForge = {
+    version: '01',
+    getProject: () => MV.clone(app.project),
+    getAnalysis: () => MV.clone(app.analysis),
+    getView: () => ({
+      mode: app.mode,
+      cam2d: MV.clone(app.view2d.cam),
+      cam3d: MV.clone(app.view3d.cam),
+      center2d: MV.clone(app.view3d.center2d),
+      selection: app.selection ? MV.clone(app.selection) : null
+    })
+  };
 
   boot();
 })(window);

@@ -113,13 +113,13 @@ a:hover { color: var(--white); border-color: var(--line-3); }
   white-space: nowrap;
 }
 
-.project-ident { display: flex; align-items: center; gap: 9px; min-width: 0; flex: 1 1 auto; }
+.project-ident { display: flex; align-items: center; gap: 9px; min-width: 0; flex: 1 1 0; }
 .field-label {
   font-family: var(--font-mono); font-size: 8px; letter-spacing: .16em; color: var(--ink-4);
   flex: 0 0 auto;
 }
 .project-name {
-  width: min(240px, 100%);
+  width: min(220px, 100%);
   background: transparent;
   border: 1px solid transparent;
   border-bottom-color: var(--line);
@@ -127,7 +127,8 @@ a:hover { color: var(--white); border-color: var(--line-3); }
   font-size: 12px;
   color: var(--ink);
   outline: none;
-  min-width: 90px;
+  min-width: 80px;
+  text-overflow: ellipsis;
   transition: border-color .15s, background .15s;
 }
 .project-name:hover { border-bottom-color: var(--line-2); }
@@ -301,7 +302,8 @@ a:hover { color: var(--white); border-color: var(--line-3); }
   font-family: var(--font-mono); font-size: 9px; letter-spacing: .02em;
   color: var(--ink-2); background: rgba(12,12,14,0.78); border: 1px solid var(--line);
   padding: 5px 9px; border-radius: 2px; backdrop-filter: blur(6px);
-  max-width: 520px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: min(520px, calc(100vw - var(--left-w) - var(--right-w) - 56px));
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .hud-chip.subtle { color: var(--ink-3); }
 .hud-connect { color: #fff; border-color: var(--line-3); }
@@ -632,12 +634,25 @@ a:hover { color: var(--white); border-color: var(--line-3); }
   .brand-sub { display: none; }
   .save-state { display: none; }
 }
+@media (max-width: 1180px) {
+  .project-ident { display: none; }
+  .topbar { gap: 10px; }
+  .mode-tabs { margin-left: auto; }
+  .top-actions { margin-left: 0; }
+}
 @media (max-width: 1120px) {
   :root { --left-w: 200px; --right-w: 296px; }
   .mode-tab kbd { display: none; }
-  .project-ident .field-label { display: none; }
   .preset-grid { grid-template-columns: 1fr; }
   .canvas-legend { display: none; }
+}
+@media (max-width: 1000px) {
+  :root { --left-w: 184px; --right-w: 280px; }
+  .brand { width: auto; }
+  .brand-title { font-size: 12px; letter-spacing: .16em; }
+  .top-actions .divider { display: none; }
+  .tool-btn { grid-template-columns: 18px 1fr auto; gap: 7px; padding-left: 7px; }
+  .region-list { padding-right: 0; }
 }
 @media (max-height: 760px) {
   .panel-block { padding-top: 10px; padding-bottom: 10px; }
