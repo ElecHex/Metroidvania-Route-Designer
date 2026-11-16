@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="ROUTE FORGE — 面向银河城游戏的 2D 路线与 3D 体块关卡设计器">
+<title>ROUTE FORGE — 银河城关卡路线设计器</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div class="app-shell">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div class="brand-text">
+        <div class="brand-title">ROUTE FORGE</div>
+        <div class="brand-sub">METROIDVANIA ROUTE DESIGNER / MP-01</div>
+      </div>
+    </div>
+
+    <div class="project-ident">
+      <span class="field-label">PROJECT</span>
+      <input id="projectName" class="project-name" value="未命名路线" spellcheck="false" aria-label="项目名称">
+      <span id="saveState" class="save-state">未保存</span>
+    </div>
+
+    <nav class="mode-tabs" role="tablist" aria-label="视图模式">
+      <button class="mode-tab is-active" data-mode="2d" role="tab">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4" width="6" height="5"/><rect x="11" y="11" width="6" height="5"/><path d="M9 6.5h2v7h-.5"/></svg>
+        <span>2D 路线</span><kbd>1</kbd>
+      </button>
+      <button class="mode-tab" data-mode="3d" role="tab">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.8 17 6.5v7L10 17.2 3 13.5v-7z"/><path d="M3 6.5 10 10l7-3.5M10 10v7.2"/></svg>
+        <span>3D 地图</span><kbd>2</kbd>
+      </button>
+    </nav>
+
+    <div class="top-actions">
+      <button id="undoBtn" class="icon-btn" title="撤销 (Ctrl+Z)" disabled aria-label="撤销">
+        <svg viewBox="0 0 20 20"><path d="M7.5 5.5 3.5 9l4 3.5"/><path d="M3.8 9h7.3a4.4 4.4 0 0 1 0 8.8H8.5"/></svg>
+      </button>
+      <button id="redoBtn" class="icon-btn" title="重做 (Ctrl+Shift+Z)" disabled aria-label="重做">
+        <svg viewBox="0 0 20 20"><path d="M12.5 5.5 16.5 9l-4 3.5"/><path d="M16.2 9H8.9a4.4 4.4 0 0 0 0 8.8h2.6"/></svg>
+      </button>
+      <span class="divider"></span>
+      <button id="saveBtn" class="icon-btn" title="保存到本地 (Ctrl+S)" aria-label="保存">
+        <svg viewBox="0 0 20 20"><path d="M4 3.5h9l3 3V16.5H4z"/><path d="M7 3.5v4h6v-4M7 16.5v-5h6v5"/></svg>
+      </button>
+      <button id="exportBtn" class="icon-btn" title="导出 JSON 存档" aria-label="导出 JSON">
+        <svg viewBox="0 0 20 20"><path d="M10 13.5V3.5M6.5 7l3.5-3.5L13.5 7"/><path d="M4 11v5.5h12V11"/></svg>
+      </button>
+      <button id="importBtn" class="icon-btn" title="导入 JSON 存档" aria-label="导入 JSON">
+        <svg viewBox="0 0 20 20"><path d="M10 3.5v10M6.5 10l3.5 3.5 3.5-3.5"/><path d="M4 13v3.5h12V13"/></svg>
+      </button>
+      <span class="divider"></span>
+      <button id="presetBtn" class="btn btn-ghost">
+        <svg viewBox="0 0 20 20"><path d="m10 2.8 3 3-3 3-3-3zM5.5 10.2l2.6 2.6-2.6 2.6-2.6-2.6zM14.5 10.2l2.6 2.6-2.6 2.6-2.6-2.6z"/></svg>
+        预设
+      </button>
+      <button id="helpBtn" class="icon-btn help-btn" title="快捷键与说明" aria-label="帮助">?</button>
+    </div>
+  </header>
+
+  <div class="workspace">
+    <aside class="left-panel">
+      <section class="panel-block">
+        <div class="panel-heading"><span>工具</span><span class="heading-hint">V R C I H</span></div>
+        <div class="tool-list" id="toolList">
+          <button class="tool-btn is-active" data-tool="select" title="选择 / 移动 (V)">
+            <svg viewBox="0 0 20 20"><path d="M5 3.5 15 10l-4.4 1.2L8.4 16z"/></svg><span>选择</span><kbd>V</kbd>
+          </button>
+          <button class="tool-btn" data-tool="room" title="绘制房间 (R)">
+            <svg viewBox="0 0 20 20"><rect x="3.5" y="4.5" width="13" height="11"/><path d="M3.5 8h13"/></svg><span>房间</span><kbd>R</kbd>
+          </button>
+          <button class="tool-btn" data-tool="connect" title="连接门锁 (C)">
+            <svg viewBox="0 0 20 20"><circle cx="5" cy="10" r="2.2"/><circle cx="15" cy="10" r="2.2"/><path d="M7.2 10h5.6"/></svg><span>连接</span><kbd>C</kbd>
+          </button>
+          <button class="tool-btn" data-tool="item" title="放置物品 (I)">
+            <svg viewBox="0 0 20 20"><path d="m10 3.2 5.2 6.8L10 16.8 4.8 10z"/><path d="M10 6v8"/></svg><span>物品</span><kbd>I</kbd>
+          </button>
+          <button class="tool-btn" data-tool="pan" title="平移视图 (H / 空格拖动)">
+            <svg viewBox="0 0 20 20"><path d="M7 9V5.6a1.2 1.2 0 0 1 2.4 0V9m0-1.2a1.2 1.2 0 0 1 2.4 0V9m0-.8a1.2 1.2 0 0 1 2.4 0v3.1c0 3-1.9 5-5 5-2.6 0-4-1.3-5-3.4L3.2 11a1.3 1.3 0 0 1 2.2-1.3L7 11.5"/></svg><span>平移</span><kbd>H</kbd>
+          </button>
+        </div>
+      </section>
+
+      <section class="panel-block">
+        <div class="panel-heading"><span>物品类型</span></div>
+        <div class="segmented" id="itemKindSeg">
+          <button class="is-active" data-kind="ability">能力</button>
+          <button data-kind="key">钥匙</button>
+          <button data-kind="upgrade">强化</button>
+          <button data-kind="boss">Boss</button>
+        </div>
+        <p class="micro-copy">物品工具激活时，点击房间放置。</p>
+      </section>
+
+      <section class="panel-block region-block">
+        <div class="panel-heading">
+          <span>区域</span>
+          <button id="addRegionBtn" class="mini-btn" title="新增区域">+</button>
+        </div>
+        <div id="regionList" class="region-list"></div>
+      </section>
+
+      <section class="panel-block">
+        <div class="panel-heading"><span>图层</span></div>
+        <div class="layer-list" id="layerList">
+          <label><input type="checkbox" data-layer="gates" checked><span>门锁标记</span></label>
+          <label><input type="checkbox" data-layer="items" checked><span>房间物品</span></label>
+          <label><input type="checkbox" data-layer="regions" checked><span>区域标记</span></label>
+          <label><input type="checkbox" data-layer="path" checked><span>主线高亮</span></label>
+          <label><input type="checkbox" data-layer="phases" checked><span>阶段着色</span></label>
+          <label><input type="checkbox" data-layer="grid" checked><span>网格</span></label>
+          <label><input type="checkbox" data-layer="names" checked><span>房间名称</span></label>
+        </div>
+      </section>
+
+      <div class="left-footer">
+        <button id="exportPngBtn" class="btn btn-ghost btn-wide" title="导出当前 2D 路线为 PNG">
+          <svg viewBox="0 0 20 20"><rect x="3" y="4" width="14" height="12"/><circle cx="7.2" cy="8" r="1.3"/><path d="m4 14 4-4 3 3 2-2 3 3"/></svg>
+          导出路线 PNG
+        </button>
+        <div class="version-line">BUILD 01 / LOCAL ONLY</div>
+      </div>
+    </aside>
+
+    <main class="stage">
+      <div id="stage2d" class="stage-view is-active">
+        <canvas id="canvas2d"></canvas>
+        <div class="stage-hud top">
+          <div class="hud-chip" id="toolHint">选择：单击房间，拖动移动，拖角缩放</div>
+          <div class="hud-chip hud-connect" id="connectHint" hidden></div>
+        </div>
+        <div class="zoom-controls">
+          <button data-zoom="out" title="缩小">−</button>
+          <button data-zoom="fit" title="适应内容">FIT</button>
+          <button data-zoom="in" title="放大">+</button>
+        </div>
+        <div class="stage-hud bottom">
+          <span class="mono">SCROLL 缩放</span><span class="hud-sep">/</span><span class="mono">SPACE 拖动</span><span class="hud-sep">/</span><span class="mono">DEL 删除</span>
+        </div>
+      </div>
+
+      <div id="stage3d" class="stage-view">
+        <canvas id="canvas3d"></canvas>
+        <div class="stage-hud top">
+          <div class="hud-chip" id="toolHint3d">左键拖动房间 · 右键旋转 · 滚轮缩放 · Shift+拖动改高度</div>
+        </div>
+        <div class="view-controls">
+          <button data-view3d="iso" class="is-active">ISO</button>
+          <button data-view3d="top">TOP</button>
+          <button data-view3d="front">FRONT</button>
+          <button data-view3d="fit" title="适应全部">FIT</button>
+        </div>
+        <div class="stage-hud bottom">
+          <span class="mono">LMB 移动</span><span class="hud-sep">/</span><span class="mono">RMB 旋转</span><span class="hud-sep">/</span><span class="mono">SHIFT 高度</span><span class="hud-sep">/</span><span class="mono">F 聚焦</span>
+        </div>
+      </div>
+      <div id="canvasTooltip" class="canvas-tooltip" hidden></div>
+    </main>
+
+    <aside class="right-panel">
+      <div class="right-tabs" role="tablist" aria-label="侧栏">
+        <button class="is-active" data-rtab="inspect" role="tab">检查器</button>
+        <button data-rtab="progress" role="tab">进度</button>
+        <button data-rtab="guide" role="tab">指南</button>
+      </div>
+      <div id="rightBody" class="right-body"></div>
+    </aside>
+  </div>
+
+  <footer class="statusbar">
+    <div class="status-left">
+      <span class="status-mode" id="statusMode">2D ROUTE</span>
+      <span id="statusCounts">0 rooms / 0 links / 0 items</span>
+    </div>
+    <div class="status-right">
+      <span id="statusCoords">X — Y —</span>
+      <span id="statusZoom">100%</span>
+      <span class="status-dot"></span>
+      <span id="statusAnalysis">READY</span>
+    </div>
+  </footer>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+<div id="modalRoot"></div>
+<input id="fileInput" type="file" accept="application/json,.json" hidden>
+
+<script src="js/core.js"></script>
+<script src="js/presets.js"></script>
+<script src="js/logic.js"></script>
+<script src="js/render2d.js"></script>
+<script src="js/render3d.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
