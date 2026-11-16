@@ -543,7 +543,7 @@
     if (!els.treeSummary || !app.analysis) return;
     const graph = MV.buildLockTree(app.project, app.analysis);
     const meta = graph.meta;
-    els.treeSummary.textContent = meta.nodes + ' nodes / ' + meta.layers + ' layers / ' + meta.gates + ' gates' +
+    els.treeSummary.textContent = meta.items + ' items / ' + meta.steps + ' steps / ' + meta.gates + ' locks' +
       (meta.optional ? ' / ' + meta.optional + ' optional' : '') +
       (meta.cycles ? ' / ' + meta.cycles + ' cycles' : '');
     const mainBtn = document.querySelector('[data-tree-main]');
@@ -1212,15 +1212,15 @@
           <li><strong>区域过滤</strong>：可只显示一个或多个区域；过滤只影响地图显示，分析与路线判定仍基于完整项目。</li>
           <li><strong>主线高亮</strong>用最短路径给出终局路线骨架；它不替代完整流程，但能快速暴露“主路过长 / 主路过短 / 终局区域太早暴露”等问题。</li>
           <li><strong>门锁统计</strong>检查门锁类型是否过于单一。全图都是导弹门，会让能力节奏变得扁平。</li>
-          <li><strong>能力锁树</strong>把能力、钥匙、门锁和后续道具整理成依赖图，专门检查锁链结构与软锁。</li>
+          <li><strong>能力锁树</strong>按获得步骤纵向排列能力、钥匙、门锁与后续道具，专门检查能力节奏、钥匙预算和软锁。</li>
         </ul>
       </section>
 
       <section>
         <h2>03 / 能力锁树</h2>
-        <p>能力锁树把“能力 / 钥匙 → 门锁 → 后续道具”画成一张分层图。它回答的不是房间长什么样，而是<strong>路线的因果结构</strong>：哪个能力解开了哪扇门，哪件道具又是从哪扇门后面获得的。Boss Keys 式的锁钥分析通常关注这条链是否过长、是否出现单一能力垄断、钥匙预算是否迫使玩家回顾整张地图。</p>
-        <div class="guide-card"><h3>怎么读</h3><p>左侧是起始房间，向右是后续解锁。蓝色节点是能力，金色是全局钥匙预算，彩色小方块是门锁，虚线节点是可选择强化。橙色 / 红色边表示“需求”，彩色边表示“解锁”。主线节点会带一条竖线标记。</p></div>
-        <div class="guide-card"><h3>怎么用</h3><p>单击节点在右侧检查器里查看对应物品或连接；双击节点或按 F 切到 2D 并定位。用 MAIN 按钮压暗非主线节点，检查关键路径是否过度依赖单一能力或单一区域。</p></div>
+        <p>能力锁树把“能力 / 钥匙 → 门锁 → 后续道具”按<strong>获得步骤</strong>纵向排列。从上到下就是推进顺序：每一行是一个阶段，上方卡片是本步获得的能力、钥匙、Boss 或可选强化，下方带颜色的卡片是本步解锁的门锁。</p>
+        <div class="guide-card"><h3>怎么读</h3><p>每张门锁卡都直接写出“← 需要什么 / → 通向哪里”，例如“← 瓦利亚服 → 岩浆湖”。顶部是起始房间与全局钥匙池；下方 STEP 00 到终局按时间推进。虚线卡片是可选强化，带竖线的是主线内容。</p></div>
+        <div class="guide-card"><h3>怎么用</h3><p>单击卡片在右侧检查器里查看对应物品或连接；双击卡片或按 F 切到 2D 并定位。拖动可上下查看后续步骤，滚轮缩放，FIT 查看完整时间线。用 MAIN 压暗非主线，检查能力与门锁的节奏。</p></div>
       </section>
 
       <section>
@@ -1841,11 +1841,12 @@
       return;
     }
     const graph = MV.buildLockTree(app.project, app.analysis);
-    const cam = MV.RenderTree.fitCamera(graph, W, H, 80);
-    if (readable && cam.zoom < (W >= 700 ? 0.5 : 0.42)) {
-      cam.zoom = W >= 700 ? 0.5 : 0.42;
-      cam.x = graph.bounds.minX + (W / 2 - 46) / cam.zoom;
-      cam.y = (graph.bounds.minY + graph.bounds.maxY) / 2;
+    const cam = MV.RenderTree.fitCamera(graph, W, H, 60);
+    const minZoom = W >= 700 ? 0.6 : 0.45;
+    if (readable && cam.zoom < minZoom) {
+      cam.zoom = minZoom;
+      cam.x = graph.bounds.minX + (W / 2 - 40) / cam.zoom;
+      cam.y = graph.bounds.minY + (H / 2 - 26) / cam.zoom;
     }
     app.viewTree.cam = cam;
     app.fittedTree = true;
@@ -2742,7 +2743,7 @@
         <div class="section-label">区域过滤</div>
         <p class="about-copy">左侧区域列表的复选框控制 2D / 3D 显示，可同时隐藏多个区域；区域检查器里有“仅显示此区域”，区域标题右侧的“全部”恢复所有区域。过滤只影响地图显示，不改变进度分析与路线判定。</p>
         <div class="section-label">能力锁树</div>
-        <p class="about-copy">顶栏第三个模式是能力锁树：它以能力、钥匙和可选强化为节点，以门锁为中间节点，展示“谁打开什么、什么又通向哪里”。单击节点会在右侧检查器里选中对应物品或连接；双击节点或按 F 可切到 2D 并定位。它适合检查能力节奏、钥匙预算和软锁链。</p>
+        <p class="about-copy">顶栏第三个模式是能力锁树：它按获得步骤从上到下排列，每一行是一个阶段，上方卡片是本步获得的能力、钥匙、Boss 或可选强化，下方带颜色的卡片是本步解锁的门锁。每张门锁卡直接标出“← 需要什么 / → 通向哪里”。单击卡片在右侧检查器查看对应物品或连接；双击或按 F 切到 2D 定位。</p>
         <div class="section-label">数据</div>
         <p class="about-copy">项目自动保存在浏览器 localStorage。顶栏的保存按钮会立即写入；导出 JSON 是长期备份的可靠方式。导入时会先备份当前项目到 <span class="mono">routeforge.backup.v1</span>。PNG 导出会重新排版整张 2D 路线图，不依赖当前缩放。</p>
         <div class="section-label">预设说明</div>

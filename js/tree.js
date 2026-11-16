@@ -1,5 +1,6 @@
 /* ============================================================
-   ROUTE FORGE — ability lock tree (Boss Keys inspired)
+   ROUTE FORGE — ability lock timeline
+   Step-ordered progression view: items acquired, locks opened.
    ============================================================ */
 (function (global) {
   'use strict';
@@ -8,17 +9,19 @@
   const FONT_UI = '"Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei", sans-serif';
   const FONT_MONO = '"Cascadia Mono", "Consolas", "Microsoft YaHei", monospace';
 
-  let lastLayout = { width: 0, height: 0, cam: null, nodes: [], graph: null };
+  let lastLayout = { width: 0, height: 0, cam: null, nodes: [], gateChips: [], graph: null };
 
   function makeNode(id, type, opts) {
     return Object.assign({
-      id, type, x: 0, y: 0, w: 210, h: 52,
-      optional: false, main: false, cycle: false, missing: false
+      id, type, x: 0, y: 0, w: 200, h: 46,
+      optional: false, main: false, step: 0
     }, opts || {});
   }
 
   function buildLockTree(project, analysis) {
-    if (!project || !analysis) return { nodes: [], edges: [], meta: { nodes: 0, layers: 0 } };
+    if (!project || !analysis) {
+      return { nodes: [], gateChips: [], steps: [], bounds: { minX: 0, minY: 0, maxX: 800, maxY: 400 }, meta: { items: 0, gates: 0, steps: 0, optional: 0, keys: 0, unreachableItems: 0 } };
+    }
     const roomMap = {};
     const regionMap = {};
     const linkMap = {};
@@ -27,20 +30,27 @@
     project.links.forEach(link => { linkMap[link.id] = link; });
     const reachable = new Set(analysis.reachable || []);
     const roomPhase = analysis.roomPhase || {};
+    const startAbilities = new Set(project.startAbilities || []);
     const pathRooms = new Set(analysis.path || []);
     const pathLinks = new Set(analysis.pathLinks || []);
     const phaseOf = roomId => roomPhase[roomId] == null ? 999 : roomPhase[roomId];
-    const startAbilities = new Set(project.startAbilities || []);
-
-    const items = (project.items || []).filter(item => reachable.has(item.room));
-    const includedItems = items.filter(item => item.kind !== 'key' || !!item.grants);
-    const unpickedKeys = items.filter(item => item.kind === 'key' && !item.grants);
 
     function isProgressionGate(link) {
       if (!link) return false;
       if (Number(link.keyReq) > 0) return true;
       return (link.requires || []).some(req => !startAbilities.has(req));
     }
+
+    const items = (project.items || []).filter(item => reachable.has(item.room));
+    const includedItems = items.filter(item => item.kind !== 'key' || !!item.grants);
+    const unpickedKeys = items.filter(item => item.kind === 'key' && !item.grants);
+
+    const itemStep = {};
+    const itemOrder = {};
+    (analysis.timeline || []).forEach((entry, index) => {
+      itemStep[entry.itemId] = entry.step;
+      itemOrder[entry.itemId] = index;
+    });
 
     const startRoom = roomMap[project.startRoom] || project.rooms[0];
     const startRegion = startRoom ? regionMap[startRoom.region] : null;
@@ -49,16 +59,14 @@
       sub: startRegion ? startRegion.code + ' · ' + startRegion.name : 'START',
       icon: 'S',
       roomId: startRoom ? startRoom.id : '',
-      w: 200, h: 56, main: true, color: '#ffffff'
+      w: 210, h: 48, main: true, color: '#ffffff', step: 0
     });
-    const nodes = [root];
-    const itemNodes = new Map();
 
-    includedItems.forEach(item => {
+    const itemNodes = includedItems.map(item => {
       const room = roomMap[item.room];
       const region = room ? regionMap[room.region] : null;
       const kind = MV.itemKindById(item.kind);
-      const node = makeNode('item:' + item.id, 'item', {
+      return makeNode('item:' + item.id, 'item', {
         itemId: item.id,
         kind: item.kind,
         label: item.name,
@@ -67,10 +75,13 @@
         color: kind.color,
         regionColor: region ? MV.regionColor(region, 'color') : '#8f98a8',
         optional: !!item.optional,
-        main: pathRooms.has(item.room) && !item.optional
+        main: pathRooms.has(item.room) && !item.optional,
+        step: itemStep[item.id] != null ? itemStep[item.id] : (phaseOf(item.room) === 999 ? 0 : phaseOf(item.room))
       });
-      nodes.push(node);
-      itemNodes.set(item.id, node);
+    });
+    itemNodes.sort((a, b) => {
+      if (a.step !== b.step) return a.step - b.step;
+      return (itemOrder[a.itemId] || 0) - (itemOrder[b.itemId] || 0);
     });
 
     const keyGates = project.links.filter(link => Number(link.keyReq) > 0 && isProgressionGate(link));
@@ -85,174 +96,126 @@
         sub: keyRegions.size + ' 个区域 · 全局钥匙预算',
         icon: 'KY',
         color: '#ffd54f',
-        w: 205, h: 54
+        w: 200, h: 48, step: 0
       });
-      nodes.push(keypool);
     }
 
+    const maxItemStep = itemNodes.reduce((max, node) => Math.max(max, node.step), 0);
+    const maxGateStep = Object.keys(analysis.unlockSteps || {}).reduce((max, key) => Math.max(max, Number(key) || 0), 0);
+    const stepCount = Math.max(analysis.stepCount || 1, maxItemStep + 1, maxGateStep + 1);
+
+    const gateChipsAll = [];
     const usedGates = new Set();
-    function gateInfo(link) {
-      const gate = MV.gateById(link.gate);
-      usedGates.add(link.id);
-      return {
-        linkId: link.id,
-        code: gate.code,
-        name: gate.name,
-        color: gate.color,
-        requires: (link.requires || []).filter(req => !startAbilities.has(req)).map(req => MV.abilityName(project, req)),
-        keyReq: Number(link.keyReq) || 0,
-        main: pathLinks.has(link.id)
-      };
-    }
-
-    const edges = [];
-    const edgeMap = new Map();
-    function addEdge(from, to, kind, gate) {
-      if (!from || !to || from.id === to.id) return;
-      const key = from.id + '>' + to.id;
-      let edge = edgeMap.get(key);
-      if (!edge) {
-        edge = { from: from.id, to: to.id, kind, gates: [], main: false, optional: false };
-        edgeMap.set(key, edge);
-        edges.push(edge);
-      }
-      if (gate && !edge.gates.some(item => item.linkId === gate.linkId)) edge.gates.push(gate);
-      edge.optional = edge.optional || !!from.optional || !!to.optional;
-    }
-
-    function sourceForGate(link) {
-      if (!link) return null;
-      if (Number(link.keyReq) > 0 && keypool) return keypool;
-      const sources = [];
-      (link.requires || []).filter(req => !startAbilities.has(req)).forEach(req => {
-        const granting = includedItems
-          .filter(item => item.grants === req)
-          .sort((a, b) => phaseOf(a.room) - phaseOf(b.room));
-        if (granting.length) {
-          sources.push({ item: granting[0], phase: phaseOf(granting[0].room) });
-        }
+    const steps = [];
+    for (let stepIndex = 0; stepIndex < stepCount; stepIndex++) {
+      const stepItems = itemNodes.filter(node => node.step === stepIndex);
+      const gateIds = new Set(analysis.unlockSteps && analysis.unlockSteps[stepIndex] ? analysis.unlockSteps[stepIndex] : []);
+      project.links.forEach(link => {
+        if (!isProgressionGate(link)) return;
+        if (analysis.openLinks && analysis.openLinks[link.id] === stepIndex) gateIds.add(link.id);
       });
-      if (!sources.length) return null;
-      sources.sort((a, b) => b.phase - a.phase);
-      return itemNodes.get(sources[0].item.id);
-    }
-
-    includedItems.forEach(item => {
-      const itemNode = itemNodes.get(item.id);
-      const chain = (analysis.gateChains[item.room] || [])
-        .filter(linkId => isProgressionGate(linkMap[linkId]));
-      if (!chain.length) {
-        addEdge(root, itemNode, 'root');
-        return;
-      }
-      chain.forEach(linkId => {
+      const gates = [];
+      gateIds.forEach(linkId => {
+        if (usedGates.has(linkId)) return;
         const link = linkMap[linkId];
-        const source = sourceForGate(link);
-        addEdge(source || root, itemNode, source ? 'gate' : 'root', gateInfo(link));
-        if (!source) itemNode.missingGate = true;
+        if (!isProgressionGate(link)) return;
+        const gate = MV.gateById(link.gate);
+        const a = roomMap[link.a];
+        const b = roomMap[link.b];
+        const target = (phaseOf(link.a) >= phaseOf(link.b) ? a : b) || b || a;
+        const requirements = (link.requires || [])
+          .filter(req => !startAbilities.has(req))
+          .map(req => MV.abilityName(project, req));
+        if (Number(link.keyReq) > 0) requirements.push('钥匙 ×' + link.keyReq);
+        usedGates.add(linkId);
+        gates.push({
+          type: 'gate',
+          linkId,
+          code: gate.code,
+          name: gate.name,
+          color: gate.color,
+          requires: requirements,
+          targetRoom: target ? target.name : '?',
+          main: pathLinks.has(linkId),
+          step: stepIndex
+        });
       });
-    });
-
-    if (keypool) addEdge(root, keypool, 'root');
-
-    /* keep the graph connected for layout */
-    nodes.forEach(node => {
-      if (node.id !== 'root' && !edges.some(edge => edge.to === node.id)) {
-        addEdge(root, node, 'root');
-      }
-    });
-    const nodeLookup = new Map(nodes.map(node => [node.id, node]));
-    edges.forEach(edge => {
-      const from = nodeLookup.get(edge.from);
-      const to = nodeLookup.get(edge.to);
-      edge.main = !!(from && to && to.main && (from.main || edge.gates.some(gate => gate.main)));
-    });
-
-    /* -------- longest-path layering -------- */
-    const layer = new Map();
-    const indegree = new Map(nodes.map(node => [node.id, 0]));
-    edges.forEach(edge => indegree.set(edge.to, (indegree.get(edge.to) || 0) + 1));
-    layer.set('root', 0);
-    const queue = nodes.filter(node => (indegree.get(node.id) || 0) === 0).map(node => node.id);
-    if (!queue.includes('root')) queue.unshift('root');
-    let guard = 0;
-    while (queue.length && guard++ < 500) {
-      const current = queue.shift();
-      edges.filter(edge => edge.from === current).forEach(edge => {
-        layer.set(edge.to, Math.max(layer.get(edge.to) || 0, (layer.get(current) || 0) + 1));
-        indegree.set(edge.to, indegree.get(edge.to) - 1);
-        if (indegree.get(edge.to) === 0) queue.push(edge.to);
-      });
-    }
-    let maxLayer = 0;
-    layer.forEach(value => { maxLayer = Math.max(maxLayer, value); });
-    nodes.forEach(node => {
-      if (!layer.has(node.id)) {
-        layer.set(node.id, maxLayer + 1);
-        node.cycle = true;
-      }
-    });
-    maxLayer = 0;
-    layer.forEach(value => { maxLayer = Math.max(maxLayer, value); });
-
-    const parents = new Map(nodes.map(node => [node.id, []]));
-    edges.forEach(edge => {
-      const list = parents.get(edge.to);
-      if (list) list.push(edge.from);
-    });
-    const byId = new Map(nodes.map(node => [node.id, node]));
-    const typeOrder = { root: 0, item: 1, gate: 2, keypool: 3 };
-    const layers = [];
-    for (let i = 0; i <= maxLayer; i++) layers.push([]);
-    nodes.forEach(node => { layers[layer.get(node.id)].push(node); });
-
-    for (let li = 0; li < layers.length; li++) {
-      const list = layers[li];
-      list.sort((a, b) => {
-        const aParents = parents.get(a.id) || [];
-        const bParents = parents.get(b.id) || [];
-        const aY = aParents.reduce((sum, id) => sum + (byId.get(id) ? byId.get(id).y : 0), 0) / Math.max(1, aParents.length);
-        const bY = bParents.reduce((sum, id) => sum + (byId.get(id) ? byId.get(id).y : 0), 0) / Math.max(1, bParents.length);
-        if (Math.abs(aY - bY) > 1) return aY - bY;
-        if (a.optional !== b.optional) return a.optional ? 1 : -1;
-        if (typeOrder[a.type] !== typeOrder[b.type]) return typeOrder[a.type] - typeOrder[b.type];
-        return a.label.localeCompare(b.label, 'zh-CN');
-      });
-      const gap = 14;
-      const total = list.reduce((sum, node) => sum + node.h, 0) + gap * Math.max(0, list.length - 1);
-      let cursor = -total / 2;
-      list.forEach(node => {
-        node.x = li * 260;
-        node.y = cursor + node.h / 2;
-        cursor += node.h + gap;
-      });
+      steps.push({ index: stepIndex, items: stepItems, gates });
+      gateChipsAll.push(...gates);
     }
 
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    nodes.forEach(node => {
-      minX = Math.min(minX, node.x - node.w / 2);
-      maxX = Math.max(maxX, node.x + node.w / 2);
-      minY = Math.min(minY, node.y - node.h / 2);
-      maxY = Math.max(maxY, node.y + node.h / 2);
+    /* -------- fixed step-based layout -------- */
+    const usedSteps = steps.filter(step => step.items.length || step.gates.length);
+    const cols = 4;
+    const cardW = 200, cardH = 40, gateH = 36;
+    const gapX = 14, gapY = 6;
+    const headerH = 22, stepGap = 18;
+    const contentW = cols * cardW + (cols - 1) * gapX;
+    root.x = 105;
+    root.y = 22;
+    root.h = 44;
+    if (keypool) {
+      keypool.x = contentW - 100;
+      keypool.y = 22;
+      keypool.h = 44;
+    }
+    let y = 74;
+    usedSteps.forEach(step => {
+      step.top = y;
+      step.header = { x: 0, y, w: contentW, h: headerH };
+      const itemsTop = y + headerH + 6;
+      step.items.forEach((node, index) => {
+        const col = index % cols;
+        const row = Math.floor(index / cols);
+        node.x = col * (cardW + gapX) + cardW / 2;
+        node.y = itemsTop + row * (cardH + gapY) + cardH / 2;
+        node.w = cardW;
+        node.h = cardH;
+      });
+      const itemRows = Math.max(1, Math.ceil(step.items.length / cols));
+      const gatesTop = itemsTop + itemRows * (cardH + gapY) + 1;
+      step.gates.forEach((chip, index) => {
+        const col = index % cols;
+        const row = Math.floor(index / cols);
+        chip.x = col * (cardW + gapX) + cardW / 2;
+        chip.y = gatesTop + row * (gateH + gapY) + gateH / 2;
+        chip.w = cardW;
+        chip.h = gateH;
+      });
+      const gateRows = Math.ceil(step.gates.length / cols);
+      const bottom = step.gates.length
+        ? gatesTop + gateRows * (gateH + gapY)
+        : itemsTop + itemRows * (cardH + gapY);
+      step.bottom = bottom;
+      step.rect = { x: -10, y: y - 3, w: contentW + 20, h: bottom - y + 6 };
+      y = bottom + stepGap;
     });
-    const bounds = { minX, minY, maxX, maxY };
-    const cycles = nodes.filter(node => node.cycle).length;
+
+    const bounds = {
+      minX: -24, minY: 0,
+      maxX: contentW + 24,
+      maxY: Math.max(y, 200)
+    };
+    const nodes = [root];
+    if (keypool) nodes.push(keypool);
+    nodes.push(...itemNodes);
 
     return {
       nodes,
-      edges,
+      gateChips: gateChipsAll,
+      steps: usedSteps,
       rootId: 'root',
       bounds,
       meta: {
         nodes: nodes.length,
-        edges: edges.length,
-        layers: maxLayer + 1,
         items: includedItems.length,
         gates: usedGates.size,
+        steps: usedSteps.length,
+        layers: usedSteps.length,
         keys: unpickedKeys.length,
         optional: includedItems.filter(item => item.optional).length,
         unreachableItems: (project.items || []).filter(item => !reachable.has(item.room)).length,
-        cycles
+        cycles: 0
       }
     };
   }
@@ -262,22 +225,22 @@
   }
 
   function fitCamera(graph, W, H, padding) {
-    const pad = padding == null ? 80 : padding;
-    if (!graph || !graph.nodes.length) return { x: 0, y: 0, zoom: 1 };
+    const pad = padding == null ? 60 : padding;
+    if (!graph || !graph.bounds) return { x: 0, y: 0, zoom: 1 };
     const b = graph.bounds;
     const width = Math.max(100, b.maxX - b.minX);
     const height = Math.max(100, b.maxY - b.minY);
     return {
       x: (b.minX + b.maxX) / 2,
       y: (b.minY + b.maxY) / 2,
-      zoom: MV.clamp(Math.min((W - pad * 2) / width, (H - pad * 2) / height), 0.1, 1.6)
+      zoom: MV.clamp(Math.min((W - pad * 2) / width, (H - pad * 2) / height), 0.1, 1.5)
     };
   }
 
   function zoomAt(view, W, H, sx, sy, factor) {
     const beforeX = (sx - W / 2) / view.cam.zoom + view.cam.x;
     const beforeY = (sy - H / 2) / view.cam.zoom + view.cam.y;
-    view.cam.zoom = MV.clamp(view.cam.zoom * factor, 0.08, 2.4);
+    view.cam.zoom = MV.clamp(view.cam.zoom * factor, 0.08, 2.2);
     const afterX = (sx - W / 2) / view.cam.zoom + view.cam.x;
     const afterY = (sy - H / 2) / view.cam.zoom + view.cam.y;
     view.cam.x += beforeX - afterX;
@@ -295,168 +258,177 @@
     return result + '…';
   }
 
-  function edgeColor(edge, theme, colorMode) {
-    if (colorMode === 'mono') return edge.main ? theme.inkStrong : theme.lineDim;
-    let color = theme.lineDim;
-    if (edge.gates.length) color = edge.gates[0].color || theme.lineDim;
-    if (theme.name === 'light') color = MV.mixColor(color, theme.ink, 0.3);
-    return color;
+  function screenRect(x, y, w, h, cam, W, H) {
+    const p = worldToScreen(x, y, cam, W, H);
+    const sw = w * cam.zoom;
+    const sh = h * cam.zoom;
+    return { left: p.x - sw / 2, top: p.y - sh / 2, w: sw, h: sh, cx: p.x, cy: p.y };
   }
 
-  function drawEdge(ctx, edge, graph, cam, W, H, theme, view, chipGateSeen) {
-    const from = graph.nodes.find(node => node.id === edge.from);
-    const to = graph.nodes.find(node => node.id === edge.to);
-    if (!from || !to) return;
-    const f = worldToScreen(from.x, from.y, cam, W, H);
-    const t = worldToScreen(to.x, to.y, cam, W, H);
-    if (f.x > W + 200 || f.y > H + 200 || t.x < -200 || t.y < -200) return;
-    const dimmed = view.mainOnly && !edge.main;
-    const sx = from.x < to.x ? f.x + from.w * cam.zoom / 2 : f.x - from.w * cam.zoom / 2;
-    const tx = from.x < to.x ? t.x - to.w * cam.zoom / 2 : t.x + to.w * cam.zoom / 2;
-    const dx = Math.max(30, Math.abs(tx - sx) * 0.45);
-    const c1x = sx + (from.x < to.x ? dx : -dx);
-    const c2x = tx - (from.x < to.x ? dx : -dx);
-    const color = edgeColor(edge, theme, view.colorMode);
+  function drawStep(ctx, step, project, view, cam, W, H, theme) {
+    const r = step.rect;
+    const p = worldToScreen(r.x, r.y, cam, W, H);
+    const w = r.w * cam.zoom;
+    const h = r.h * cam.zoom;
+    if (p.x > W + 200 || p.y > H + 200 || p.x + w < -200 || p.y + h < -200) return;
+    const phaseColor = MV.phaseColor(project, step.index, Math.max(1, (view.analysis.stepCount || 1) - 1));
+    const dimmed = view.mainOnly && step.items.length && step.items.every(item => !item.main) && step.gates.every(gate => !gate.main);
     ctx.save();
-    ctx.globalAlpha = dimmed ? 0.16 : (edge.optional ? 0.6 : 0.9);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = edge.main ? 1.7 : 1.1;
-    if (edge.optional) ctx.setLineDash([3, 4]);
+    ctx.globalAlpha = dimmed ? 0.22 : 1;
+    ctx.fillStyle = MV.hexToRgba(phaseColor, theme.name === 'light' ? 0.035 : 0.04);
+    ctx.fillRect(p.x, p.y, w, h);
+    ctx.strokeStyle = MV.hexToRgba(phaseColor, theme.name === 'light' ? 0.25 : 0.32);
+    ctx.lineWidth = 1;
+    ctx.strokeRect(p.x + 0.5, p.y + 0.5, w - 1, h - 1);
+    ctx.fillStyle = MV.hexToRgba(phaseColor, 0.92);
+    ctx.fillRect(p.x, p.y, 3, h);
+
+    /* timeline spine + step dot */
+    const dotX = p.x + 10;
+    const dotY = p.y + 14 * cam.zoom;
+    ctx.fillStyle = phaseColor;
     ctx.beginPath();
-    ctx.moveTo(sx, f.y);
-    ctx.bezierCurveTo(c1x, f.y, c2x, t.y, tx, t.y);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    const arrowAngle = from.x < to.x ? 0 : Math.PI;
-    ctx.save();
-    ctx.translate(tx, t.y);
-    ctx.rotate(arrowAngle);
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(-6, -3.4);
-    ctx.lineTo(-6, 3.4);
-    ctx.closePath();
+    ctx.arc(dotX, dotY, 3, 0, Math.PI * 2);
     ctx.fill();
-    ctx.restore();
 
-    const hoverHit = view.hover && (view.hover.id === edge.from || view.hover.id === edge.to);
-    const newGates = edge.gates.filter(gate => !chipGateSeen.has(gate.linkId));
-    if (newGates.length && (edge.main || hoverHit || view.cam.zoom >= 0.42)) {
-      const midX = (sx + 3 * c1x + 3 * c2x + tx) / 8;
-      const midY = (f.y + t.y) / 2;
-      newGates.forEach(gate => chipGateSeen.add(gate.linkId));
-      lastLayout.edgeChips.push({
-        x: midX,
-        y: midY,
-        label: newGates.map(gate => gate.code).join('/'),
-        gates: newGates,
-        main: edge.main,
-        optional: edge.optional,
-        color
-      });
-    }
-    ctx.restore();
-  }
-
-  function drawEdgeChips(ctx, theme, view, W, H) {
-    lastLayout.edgeChips.forEach(chip => {
-      const p = { x: chip.x, y: chip.y };
-      if (p.x < -40 || p.x > W + 40 || p.y < -20 || p.y > H + 20) return;
-      ctx.save();
-      ctx.globalAlpha = view.mainOnly && !chip.main ? 0.18 : 1;
+    const headerY = p.y + Math.min(Math.max(10, r.h - 4), 12);
+    ctx.font = '8px ' + FONT_MONO;
+    ctx.fillStyle = theme.name === 'light' ? MV.mixColor(phaseColor, theme.ink, 0.3) : phaseColor;
+    ctx.fillText('STEP ' + String(step.index).padStart(2, '0'), p.x + 19, headerY);
+    ctx.font = '9px ' + FONT_UI;
+    ctx.fillStyle = theme.ink;
+    const title = step.index === 0 ? '起始 / 初始收集' : (step.index === (view.analysis.stepCount || 1) - 1 ? '终局' : '推进');
+    ctx.fillText(title, p.x + 79, headerY);
+    if (r.h >= 20) {
       ctx.font = '7px ' + FONT_MONO;
-      const width = ctx.measureText(chip.label).width + 8;
-      const height = 12;
-      ctx.fillStyle = theme.labelBg;
-      ctx.fillRect(p.x - width / 2, p.y - height / 2, width, height);
-      ctx.strokeStyle = view.colorMode === 'mono' ? theme.lineDim : chip.color;
-      ctx.strokeRect(p.x - width / 2 + 0.5, p.y - height / 2 + 0.5, width - 1, height - 1);
-      ctx.fillStyle = view.colorMode === 'mono' ? theme.inkDim : chip.color;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(chip.label, p.x, p.y + 0.5);
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'alphabetic';
-      chip.rect = { x: p.x - width / 2, y: p.y - height / 2, w: width, h: height };
-      ctx.restore();
-    });
+      ctx.fillStyle = theme.inkDim;
+      ctx.fillText(step.items.length + ' ITEMS · ' + step.gates.length + ' LOCKS', p.x + w - 150, headerY);
+    }
+    ctx.strokeStyle = MV.hexToRgba(phaseColor, 0.25);
+    ctx.beginPath();
+    ctx.moveTo(p.x + 19, p.y + Math.min(r.h - 2, 23));
+    ctx.lineTo(p.x + w - 8, p.y + Math.min(r.h - 2, 23));
+    ctx.stroke();
+    ctx.restore();
   }
 
-  function nodeScreenRect(node, cam, W, H) {
-    const p = worldToScreen(node.x, node.y, cam, W, H);
-    const w = node.w * cam.zoom;
-    const h = node.h * cam.zoom;
-    return { x: p.x, y: p.y, w, h, left: p.x - w / 2, top: p.y - h / 2 };
-  }
-
-  function drawNode(ctx, node, cam, W, H, theme, view) {
-    const rect = nodeScreenRect(node, cam, W, H);
-    if (rect.left > W + 80 || rect.top > H + 80 || rect.left + rect.w < -80 || rect.top + rect.h < -80) return;
+  function drawItemNode(ctx, node, view, cam, W, H, theme) {
+    const r = screenRect(node.x, node.y, node.w, node.h, cam, W, H);
+    if (r.left > W + 100 || r.top > H + 100 || r.left + r.w < -100 || r.top + r.h < -100) return;
     const colorOn = view.colorMode !== 'mono';
     const selected = view.selection && (
       (view.selection.type === 'item' && view.selection.id === node.itemId) ||
-      (view.selection.type === 'link' && view.selection.id === node.linkId) ||
       (view.selection.type === 'room' && node.type === 'root' && view.selection.id === node.roomId)
     );
     const hover = view.hover && view.hover.id === node.id;
     const dimmed = view.mainOnly && !node.main;
-    const nodeColor = colorOn ? node.color : (node.type === 'root' ? theme.accent : theme.inkDim);
-    const fillBase = node.type === 'root' ? theme.accent : theme.roomFill;
-    let fill = node.type === 'root' ? theme.accent : (colorOn ? MV.mixColor(fillBase, nodeColor, 0.1) : fillBase);
-    if (selected) fill = theme.roomSelected;
+    const color = colorOn ? node.color : theme.inkDim;
+    let fill = node.type === 'root'
+      ? theme.accent
+      : (colorOn ? MV.mixColor(theme.roomFill, node.color, 0.08) : theme.roomFill);
     if (hover) fill = theme.roomHover;
-
+    if (selected) fill = theme.roomSelected;
     ctx.save();
-    ctx.globalAlpha = dimmed ? 0.22 : (node.optional ? 0.72 : 1);
+    ctx.globalAlpha = dimmed ? 0.2 : (node.optional ? 0.72 : 1);
     ctx.fillStyle = fill;
-    ctx.fillRect(rect.left, rect.top, rect.w, rect.h);
-    ctx.strokeStyle = selected || hover ? theme.accent : (nodeColor || theme.roomBorder);
-    ctx.lineWidth = selected ? 2 : (node.main ? 1.4 : 0.9);
-    if (node.optional || node.cycle) ctx.setLineDash([4, 3]);
-    ctx.strokeRect(rect.left + 0.5, rect.top + 0.5, rect.w - 1, rect.h - 1);
+    ctx.fillRect(r.left, r.top, r.w, r.h);
+    ctx.strokeStyle = selected || hover ? theme.accent : (color || theme.roomBorder);
+    ctx.lineWidth = selected ? 2 : (node.main ? 1.3 : 0.9);
+    if (node.optional) ctx.setLineDash([4, 3]);
+    ctx.strokeRect(r.left + 0.5, r.top + 0.5, r.w - 1, r.h - 1);
     ctx.setLineDash([]);
     if (node.main) {
       ctx.fillStyle = theme.accent;
-      ctx.fillRect(rect.left + rect.w - 3, rect.top + 1, 2, rect.h - 2);
+      ctx.fillRect(r.left + r.w - 3, r.top + 1, 2, r.h - 2);
     }
     if (node.regionColor) {
       ctx.fillStyle = colorOn ? node.regionColor : theme.inkGhost;
-      ctx.fillRect(rect.left, rect.top, 2, rect.h);
+      ctx.fillRect(r.left, r.top, 2, r.h);
     }
-    if (rect.w >= 48) {
-      const showIcon = rect.w >= 74;
-      let textX = rect.left + 7;
-      if (showIcon) {
-        const iconSize = Math.min(22, rect.h - 14);
-        const iconX = rect.left + 8;
-        const iconY = rect.top + (rect.h - iconSize) / 2;
-        ctx.fillStyle = colorOn ? MV.hexToRgba(nodeColor, 0.22) : theme.roomHover;
-        ctx.fillRect(iconX, iconY, iconSize, iconSize);
-        ctx.strokeStyle = nodeColor || theme.roomBorder;
-        ctx.strokeRect(iconX + 0.5, iconY + 0.5, iconSize - 1, iconSize - 1);
-        ctx.font = '7px ' + FONT_MONO;
-        ctx.fillStyle = node.type === 'root' ? theme.accentInk : (colorOn ? nodeColor : theme.ink);
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(node.icon || '·', iconX + iconSize / 2, iconY + iconSize / 2 + 0.5);
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'alphabetic';
-        textX = iconX + iconSize + 7;
-      }
-      const maxText = rect.w - (textX - rect.left) - 7;
-      ctx.font = (showIcon ? '9.5px ' : '9px ') + FONT_UI;
-      ctx.fillStyle = node.type === 'root' ? theme.accentInk : theme.ink;
-      ctx.fillText(truncate(ctx, node.label, Math.max(20, maxText)), textX, rect.top + rect.h * (showIcon ? 0.42 : 0.56));
-      if (showIcon && rect.h >= 40) {
-        ctx.font = '7px ' + FONT_MONO;
-        ctx.fillStyle = node.type === 'root' ? theme.accentInk : theme.inkDim;
-        ctx.fillText(truncate(ctx, node.sub || '', Math.max(20, maxText)), textX, rect.top + rect.h * 0.42 + 12);
-      }
-    } else {
-      ctx.fillStyle = nodeColor || theme.ink;
-      ctx.fillRect(rect.left + rect.w / 2 - 2, rect.top + rect.h / 2 - 2, 4, 4);
+
+    const compact = r.h < 32;
+    const showIcon = !compact && r.w >= 82;
+    let textX = r.left + 7;
+    if (showIcon) {
+      const iconSize = Math.min(20, r.h - 14);
+      const iconX = r.left + 7;
+      const iconY = r.top + (r.h - iconSize) / 2;
+      ctx.fillStyle = colorOn ? MV.hexToRgba(node.color, 0.2) : theme.roomHover;
+      ctx.fillRect(iconX, iconY, iconSize, iconSize);
+      ctx.strokeStyle = node.color || theme.roomBorder;
+      ctx.strokeRect(iconX + 0.5, iconY + 0.5, iconSize - 1, iconSize - 1);
+      ctx.font = '6.5px ' + FONT_MONO;
+      ctx.fillStyle = node.type === 'root' ? theme.accentInk : (colorOn ? node.color : theme.ink);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(node.icon || '·', iconX + iconSize / 2, iconY + iconSize / 2 + 0.5);
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
+      textX = iconX + iconSize + 6;
     }
+    const maxText = r.w - (textX - r.left) - 7;
+    ctx.font = (compact ? '8.5px ' : '9px ') + FONT_UI;
+    ctx.fillStyle = node.type === 'root' ? theme.accentInk : theme.ink;
+    ctx.fillText(truncate(ctx, node.label, Math.max(20, maxText)), textX, r.top + (compact ? r.h * 0.45 : r.h * 0.4));
+    if (!compact || r.h >= 23) {
+      ctx.font = '6.5px ' + FONT_MONO;
+      ctx.fillStyle = node.type === 'root' ? theme.accentInk : theme.inkDim;
+      const subY = compact ? r.top + r.h * 0.82 : r.top + r.h * 0.4 + 12;
+      ctx.fillText(truncate(ctx, node.sub || '', Math.max(20, maxText)), textX, subY);
+    }
+    ctx.restore();
+  }
+
+  function drawGateChip(ctx, chip, view, cam, W, H, theme) {
+    const r = screenRect(chip.x, chip.y, chip.w, chip.h, cam, W, H);
+    if (r.left > W + 100 || r.top > H + 100 || r.left + r.w < -100 || r.top + r.h < -100) return;
+    const colorOn = view.colorMode !== 'mono';
+    const selected = view.selection && view.selection.type === 'link' && view.selection.id === chip.linkId;
+    const hover = view.hover && view.hover.chip && view.hover.linkId === chip.linkId;
+    const dimmed = view.mainOnly && !chip.main;
+    const accent = colorOn ? chip.color : theme.inkDim;
+    let fill = colorOn ? MV.mixColor(theme.roomFill, chip.color, 0.09) : theme.roomFill;
+    if (hover) fill = theme.roomHover;
+    if (selected) fill = theme.roomSelected;
+    ctx.save();
+    ctx.globalAlpha = dimmed ? 0.2 : 1;
+    ctx.fillStyle = fill;
+    ctx.fillRect(r.left, r.top, r.w, r.h);
+    ctx.strokeStyle = selected || hover ? theme.accent : accent;
+    ctx.lineWidth = selected ? 2 : (chip.main ? 1.3 : 0.9);
+    ctx.strokeRect(r.left + 0.5, r.top + 0.5, r.w - 1, r.h - 1);
+    ctx.fillStyle = colorOn ? MV.hexToRgba(chip.color, 0.9) : theme.inkGhost;
+    ctx.fillRect(r.left, r.top, 3, r.h);
+    if (r.w > 58) {
+      const badgeW = Math.max(20, Math.min(26, r.w * 0.18));
+      ctx.fillStyle = colorOn ? MV.hexToRgba(chip.color, 0.18) : theme.roomHover;
+      ctx.fillRect(r.left + 7, r.top + 5, badgeW, 12);
+      ctx.strokeStyle = accent;
+      ctx.strokeRect(r.left + 7.5, r.top + 5.5, badgeW - 1, 11);
+      ctx.font = '6.5px ' + FONT_MONO;
+      ctx.fillStyle = colorOn ? accent : theme.ink;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(chip.code, r.left + 7 + badgeW / 2, r.top + 11.5);
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
+      const textX = r.left + 7 + badgeW + 5;
+      const maxText = r.w - (textX - r.left) - 7;
+      ctx.font = '8.5px ' + FONT_UI;
+      ctx.fillStyle = theme.ink;
+      ctx.fillText(truncate(ctx, chip.name, Math.max(20, maxText)), textX, r.top + 12);
+      if (r.h >= 20) {
+        const requireText = chip.requires.length ? '← ' + chip.requires.join(' + ') : '← 无门槛';
+        ctx.font = '6.5px ' + FONT_MONO;
+        ctx.fillStyle = theme.inkDim;
+        const subY = r.h >= 30 ? r.top + 24 : r.top + r.h - 4;
+        ctx.fillText(truncate(ctx, requireText + '  → ' + chip.targetRoom, Math.max(20, maxText)), textX, subY);
+      }
+    }
+    lastLayout.gateChips.push({
+      left: r.left, top: r.top, w: r.w, h: r.h,
+      linkId: chip.linkId, chip
+    });
     ctx.restore();
   }
 
@@ -475,17 +447,16 @@
     const theme = MV.canvasTheme();
     const graph = buildLockTree(project, view.analysis);
     const cam = view.cam;
-    lastLayout = { width: W, height: H, cam, nodes: [], edgeChips: [], graph };
+    lastLayout = { width: W, height: H, cam, nodes: [], gateChips: [], graph };
 
     ctx.fillStyle = theme.bg;
     ctx.fillRect(0, 0, W, H);
-    const gradient = ctx.createRadialGradient(W * 0.45, H * 0.42, 20, W * 0.45, H * 0.42, Math.max(W, H) * 0.8);
+    const gradient = ctx.createRadialGradient(W * 0.5, H * 0.4, 20, W * 0.5, H * 0.4, Math.max(W, H) * 0.8);
     gradient.addColorStop(0, theme.bgGlow);
     gradient.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, W, H);
 
-    /* faint dot grid */
     let step = 50 * cam.zoom;
     while (step < 14) step *= 4;
     if (step < 90) {
@@ -499,44 +470,60 @@
       }
     }
 
-    const chipGateSeen = new Set();
-    graph.edges.forEach(edge => drawEdge(ctx, edge, graph, cam, W, H, theme, view, chipGateSeen));
-    drawEdgeChips(ctx, theme, view, W, H);
+    graph.steps.forEach(stepData => drawStep(ctx, stepData, project, view, cam, W, H, theme));
     graph.nodes.forEach(node => {
-      drawNode(ctx, node, cam, W, H, theme, view);
-      if (rectVisible(node, cam, W, H)) {
-        lastLayout.nodes.push(Object.assign(nodeScreenRect(node, cam, W, H), {
-          id: node.id, node
-        }));
+      drawItemNode(ctx, node, view, cam, W, H, theme);
+      const rect = screenRect(node.x, node.y, node.w, node.h, cam, W, H);
+      if (rect.left < W + 100 && rect.top < H + 100 && rect.left + rect.w > -100 && rect.top + rect.h > -100) {
+        lastLayout.nodes.push(Object.assign(rect, { id: node.id, node }));
       }
     });
-    return lastLayout;
-  }
+    graph.gateChips.forEach(chip => drawGateChip(ctx, chip, view, cam, W, H, theme));
 
-  function rectVisible(node, cam, W, H) {
-    const rect = nodeScreenRect(node, cam, W, H);
-    return !(rect.left > W + 80 || rect.top > H + 80 || rect.left + rect.w < -80 || rect.top + rect.h < -80);
+    /* vertical spine */
+    if (graph.steps.length) {
+      const first = graph.steps[0];
+      const last = graph.steps[graph.steps.length - 1];
+      const a = worldToScreen(-14, first.top + 14, cam, W, H);
+      const b = worldToScreen(-14, last.top + 14, cam, W, H);
+      ctx.save();
+      ctx.strokeStyle = MV.hexToRgba(theme.ink, 0.14);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+      graph.steps.forEach(stepData => {
+        const p = worldToScreen(-14, stepData.top + 14, cam, W, H);
+        const phaseColor = MV.phaseColor(project, stepData.index, Math.max(1, (view.analysis.stepCount || 1) - 1));
+        ctx.fillStyle = phaseColor;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.restore();
+    }
+    return lastLayout;
   }
 
   function pick(view, W, H, x, y) {
     if (!lastLayout || lastLayout.width !== W || lastLayout.height !== H) return null;
     for (let i = lastLayout.nodes.length - 1; i >= 0; i--) {
       const entry = lastLayout.nodes[i];
+      if (!entry) continue;
       if (x >= entry.left && x <= entry.left + entry.w && y >= entry.top && y <= entry.top + entry.h) {
         return entry.node;
       }
     }
-    for (let i = lastLayout.edgeChips.length - 1; i >= 0; i--) {
-      const chip = lastLayout.edgeChips[i];
-      if (!chip.rect) continue;
-      if (x >= chip.rect.x && x <= chip.rect.x + chip.rect.w && y >= chip.rect.y && y <= chip.rect.y + chip.rect.h) {
-        const gate = chip.gates[0];
+    for (let i = lastLayout.gateChips.length - 1; i >= 0; i--) {
+      const entry = lastLayout.gateChips[i];
+      if (x >= entry.left && x <= entry.left + entry.w && y >= entry.top && y <= entry.top + entry.h) {
         return {
           type: 'gate',
-          linkId: gate.linkId,
-          label: gate.name,
-          icon: gate.code,
-          sub: gate.requires.join(' + ') + (gate.keyReq ? ' · 钥匙 ' + gate.keyReq : ''),
+          linkId: entry.linkId,
+          label: entry.chip.name,
+          icon: entry.chip.code,
+          sub: entry.chip.requires.join(' + ') + ' → ' + entry.chip.targetRoom,
           chip: true
         };
       }
