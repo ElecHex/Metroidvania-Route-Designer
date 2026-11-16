@@ -57,13 +57,13 @@
     ];
 
     const regions = [
-      { id: 'orp', name: '太空海盗战舰 Orpheon', code: 'ORP', tone: 6 },
-      { id: 'tal', name: '塔隆地表', code: 'TAL', tone: 2 },
-      { id: 'cho', name: '鸟人族遗迹', code: 'CHO', tone: 3 },
-      { id: 'mag', name: '岩浆洞穴', code: 'MAG', tone: 0 },
-      { id: 'phe', name: '冰冻苔原', code: 'PHE', tone: 5 },
-      { id: 'phz', name: 'Phazon 矿场', code: 'PHZ', tone: 4 },
-      { id: 'imp', name: '陨石坑', code: 'IMP', tone: 7 }
+      { id: 'orp', name: '太空海盗战舰 Orpheon', code: 'ORP', tone: 6, elev: 220 },
+      { id: 'tal', name: '塔隆地表', code: 'TAL', tone: 2, elev: 0 },
+      { id: 'cho', name: '鸟人族遗迹', code: 'CHO', tone: 3, elev: 90 },
+      { id: 'mag', name: '岩浆洞穴', code: 'MAG', tone: 0, elev: -30 },
+      { id: 'phe', name: '冰冻苔原', code: 'PHE', tone: 5, elev: 160 },
+      { id: 'phz', name: 'Phazon 矿场', code: 'PHZ', tone: 4, elev: -60 },
+      { id: 'imp', name: '陨石坑', code: 'IMP', tone: 7, elev: 20 }
     ];
 
     const rooms = [
@@ -86,6 +86,7 @@
       R('tal_frigate', '坠毁战舰', 'tal', 640, 810, 150, 70, 'hazard', { height: 50 }),
       R('tal_grove', '生命丛林', 'tal', 600, 900, 140, 60, 'normal', { height: 42 }),
       R('tal_artifact', '神器神殿', 'tal', 380, 850, 160, 75, 'hub', { height: 58 }),
+      R('tal_save', '神殿存档站', 'tal', 250, 690, 110, 45, 'save', { height: 28 }),
 
       /* Chozo Ruins */
       R('cho_entrance', '遗迹入口', 'cho', 700, 80, 130, 55, 'normal', { height: 36 }),
@@ -170,6 +171,7 @@
       L('l_tal_12', 'tal_frigate', 'tal_grove', 'water', { note: '沉没的战舰，需要重力服。' }),
       L('l_tal_13', 'tal_landing', 'tal_artifact'),
       L('l_tal_14', 'tal_artifact', 'imp_entry', 'artifact', { keyReq: 12, note: '12 枚鸟人神器开启陨石坑。' }),
+      L('l_tal_15', 'tal_temple_lobby', 'tal_save'),
 
       /* Chozo */
       L('l_cho_1', 'cho_entrance', 'cho_plaza'),
@@ -335,15 +337,16 @@
       A('bossRidley', '击败里德利')
     ];
     const regions = [
-      { id: 'crt', name: '克雷特里亚', code: 'CRT', tone: 2 },
-      { id: 'brn', name: '布林斯塔', code: 'BRN', tone: 1 },
-      { id: 'nor', name: '诺法尔', code: 'NOR', tone: 0 },
-      { id: 'wrk', name: '沉船', code: 'WRK', tone: 4 },
-      { id: 'mar', name: '玛莉迪亚', code: 'MAR', tone: 5 },
-      { id: 'tou', name: '图里安', code: 'TOU', tone: 7 }
+      { id: 'crt', name: '克雷特里亚', code: 'CRT', tone: 2, elev: 0 },
+      { id: 'brn', name: '布林斯塔', code: 'BRN', tone: 1, elev: 40 },
+      { id: 'nor', name: '诺法尔', code: 'NOR', tone: 0, elev: 120 },
+      { id: 'wrk', name: '沉船', code: 'WRK', tone: 4, elev: -20 },
+      { id: 'mar', name: '玛莉迪亚', code: 'MAR', tone: 5, elev: -60 },
+      { id: 'tou', name: '图里安', code: 'TOU', tone: 7, elev: 180 }
     ];
     const rooms = [
       R('sm_landing', '着陆场', 'crt', 80, 620, 150, 80, 'start'),
+      R('sm_save', '着陆场存档站', 'crt', 80, 560, 120, 45, 'save'),
       R('sm_crateria', '克雷特里亚洞窟', 'crt', 80, 720, 130, 60, 'normal'),
       R('sm_old_tourian', '旧图里安入口', 'crt', 240, 720, 120, 55, 'normal'),
       R('sm_wreck_entry', '沉船入口', 'wrk', 580, 500, 130, 60, 'transit'),
@@ -408,7 +411,8 @@
       L('l_sm_27', 'sm_maridia_entry', 'sm_maridia_deep', 'water'),
       L('l_sm_28', 'sm_maridia_deep', 'sm_draygon'),
       L('l_sm_29', 'sm_maridia_deep', 'sm_space'),
-      L('l_sm_30', 'sm_maridia_deep', 'sm_spring')
+      L('l_sm_30', 'sm_maridia_deep', 'sm_spring'),
+      L('l_sm_32', 'sm_landing', 'sm_save')
     ];
     const items = [
       I('sm_it_missile', '导弹发射器', 'ability', 'sm_blue', 'missile'),
@@ -476,21 +480,22 @@
       A('dreamer3', '守梦人·赫拉')
     ];
     const regions = [
-      { id: 'cro', name: '遗忘十字路', code: 'CRO', tone: 2 },
-      { id: 'gre', name: '苍绿之径', code: 'GRE', tone: 5 },
-      { id: 'fun', name: '真菌荒地', code: 'FUN', tone: 4 },
-      { id: 'cit', name: '泪水之城', code: 'CIT', tone: 3 },
-      { id: 'pea', name: '水晶山峰', code: 'PEA', tone: 7 },
-      { id: 'res', name: '安息之地', code: 'RES', tone: 6 },
-      { id: 'fog', name: '雾之峡谷', code: 'FOG', tone: 1 },
-      { id: 'dee', name: '深巢', code: 'DEE', tone: 0 },
-      { id: 'edg', name: '王国边缘', code: 'EDG', tone: 1 }
+      { id: 'cro', name: '遗忘十字路', code: 'CRO', tone: 2, elev: 0 },
+      { id: 'gre', name: '苍绿之径', code: 'GRE', tone: 5, elev: 50 },
+      { id: 'fun', name: '真菌荒地', code: 'FUN', tone: 4, elev: 100 },
+      { id: 'cit', name: '泪水之城', code: 'CIT', tone: 3, elev: 160 },
+      { id: 'pea', name: '水晶山峰', code: 'PEA', tone: 7, elev: 240 },
+      { id: 'res', name: '安息之地', code: 'RES', tone: 6, elev: 200 },
+      { id: 'fog', name: '雾之峡谷', code: 'FOG', tone: 1, elev: 80 },
+      { id: 'dee', name: '深巢', code: 'DEE', tone: 0, elev: -60 },
+      { id: 'edg', name: '王国边缘', code: 'EDG', tone: 1, elev: -20 }
     ];
     const rooms = [
       R('hk_start', '国王山口', 'cro', 60, 700, 140, 65, 'start'),
       R('hk_crossroads', '遗忘十字路', 'cro', 220, 680, 170, 85, 'hub', { height: 58 }),
       R('hk_ancestral', '祖先山丘', 'cro', 220, 580, 140, 65, 'normal'),
       R('hk_false_knight', '假骑士竞技场', 'cro', 400, 680, 140, 65, 'boss', { height: 64 }),
+      R('hk_bench', '十字路长椅', 'cro', 400, 760, 120, 45, 'save', { height: 28 }),
       R('hk_green_entry', '苍绿之径入口', 'gre', 400, 580, 130, 60, 'normal'),
       R('hk_greenpath', '苍绿之径', 'gre', 550, 560, 160, 80, 'hub', { height: 66 }),
       R('hk_hornet', '大黄蜂战场', 'gre', 550, 660, 140, 70, 'boss', { height: 66 }),
@@ -555,7 +560,8 @@
       L('l_hk_24', 'hk_crossroads', 'hk_black_egg', 'ability', {
         requires: ['dreamer1', 'dreamer2', 'dreamer3'],
         note: '三位守梦人全部唤醒后，黑卵封印解除。'
-      })
+      }),
+      L('l_hk_25', 'hk_crossroads', 'hk_bench')
     ];
     const items = [
       I('hk_it_vengeful', '复仇之魂', 'ability', 'hk_ancestral', 'vengefulSpirit'),

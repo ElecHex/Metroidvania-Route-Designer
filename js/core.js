@@ -211,7 +211,7 @@
       startAbilities: [],
       startRoom: roomId,
       goalRoom: roomId,
-      regions: [{ id: regionId, name: '新区域', code: 'ZONE', tone: 1 }],
+      regions: [{ id: regionId, name: '新区域', code: 'ZONE', tone: 1, elev: 0 }],
       rooms: [{
         id: roomId, name: '起点房间', region: regionId,
         x: 0, y: 0, w: 180, h: 100, type: 'start',
@@ -248,10 +248,11 @@
         id: String(r.id),
         name: String(r.name || '未命名区域'),
         code: String(r.code || 'ZONE').toUpperCase().slice(0, 6),
-        tone: clamp(Number(r.tone) || 0, 0, REGION_TONES.length - 1)
+        tone: clamp(Number(r.tone) || 0, 0, REGION_TONES.length - 1),
+        elev: clamp(Number(r.elev) || 0, -500, 500)
       }));
     if (!project.regions.length) {
-      project.regions = [{ id: 'region_1', name: '新区域', code: 'ZONE', tone: 1 }];
+      project.regions = [{ id: 'region_1', name: '新区域', code: 'ZONE', tone: 1, elev: 0 }];
     }
 
     const regionIds = new Set(project.regions.map(r => r.id));

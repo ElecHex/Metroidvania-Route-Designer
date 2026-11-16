@@ -86,9 +86,11 @@
     const boxes = [];
 
     (project.rooms || []).forEach(room => {
+      const region = (project.regions || []).find(r => r.id === room.region);
+      const regionElev = region ? (Number(region.elev) || 0) : 0;
       const center = vec(
         (room.x + room.w / 2 - center2d.x) * SCALE,
-        room.elev * HEIGHT_SCALE,
+        (regionElev + room.elev) * HEIGHT_SCALE,
         (room.y + room.h / 2 - center2d.y) * SCALE
       );
       const width = room.w * SCALE;
@@ -116,13 +118,25 @@
 
   function fitCamera(project, W, H) {
     const bounds = mapBounds(project);
-    const width = Math.max(10, (bounds.maxX - bounds.minX) * SCALE);
-    const depth = Math.max(10, (bounds.maxY - bounds.minY) * SCALE);
+    const width = Math.max(10, (bounds.maxX - bounds.minX + 70) * SCALE);
+    const depth = Math.max(10, (bounds.maxY - bounds.minY + 70) * SCALE);
+    let minY = Infinity, maxY = -Infinity;
+    (project.rooms || []).forEach(room => {
+      const region = (project.regions || []).find(r => r.id === room.region);
+      const base = ((region ? Number(region.elev) || 0 : 0) + room.elev) * HEIGHT_SCALE;
+      minY = Math.min(minY, base);
+      maxY = Math.max(maxY, base + room.height * HEIGHT_SCALE);
+    });
+    if (!Number.isFinite(minY)) { minY = 0; maxY = 2; }
+    const span = Math.max(2, maxY - minY);
+    const focal = (H / 2) / Math.tan(FOV / 2);
+    const distH = (width * 1.15) * focal / (Math.max(1, W) * 0.76);
+    const distV = span * 2.4 + 10;
     return {
       yaw: -0.62,
-      pitch: 0.58,
-      dist: clamp(Math.max(width, depth) * 1.5 + 9, 14, 140),
-      target: vec(0, 1.4, 0)
+      pitch: 0.55,
+      dist: clamp(Math.max(distH, distV, 20), 20, 190),
+      target: vec(0, (minY + maxY) / 2, 0)
     };
   }
 
@@ -189,12 +203,14 @@
         maxY = Math.max(maxY, room.y + room.h);
       });
       const pad = 30;
-      const corners = [
+      const regionElev = (Number(region.elev) || 0) * HEIGHT_SCALE;
+      const worldCorners = [
         [minX - pad, minY - pad], [maxX + pad, minY - pad],
         [maxX + pad, maxY + pad], [minX - pad, maxY + pad]
-      ].map(([x, y]) => projectPoint(sc.basis, vec(
-        (x - sc.center2d.x) * SCALE, 0.015, (y - sc.center2d.y) * SCALE
-      )));
+      ].map(([x, y]) => vec(
+        (x - sc.center2d.x) * SCALE, regionElev + 0.015, (y - sc.center2d.y) * SCALE
+      ));
+      const corners = worldCorners.map(p => projectPoint(sc.basis, p));
       if (corners.some(p => !p)) return;
       ctx.save();
       ctx.beginPath();
@@ -207,6 +223,21 @@
       ctx.setLineDash([3, 5]);
       ctx.stroke();
       ctx.setLineDash([]);
+
+      if (regionElev) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.045)';
+        ctx.setLineDash([2, 5]);
+        ctx.beginPath();
+        worldCorners.forEach(world => {
+          const ground = projectPoint(sc.basis, vec(world.x, 0, world.z));
+          const top = projectPoint(sc.basis, world);
+          if (!ground || !top) return;
+          ctx.moveTo(top.x, top.y);
+          ctx.lineTo(ground.x, ground.y);
+        });
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
       ctx.restore();
       labels.push({ region, point: corners[0], roomCount: regionRooms.length });
     });
@@ -220,10 +251,10 @@
     const maxX = (b.maxX - sc.center2d.x) * SCALE + pad;
     const minZ = (b.minY - sc.center2d.y) * SCALE - pad;
     const maxZ = (b.maxY - sc.center2d.y) * SCALE + pad;
-    const step = 2;
+    const step = 3;
     ctx.save();
     ctx.lineWidth = 1;
-    ctx.strokeStyle = 'rgba(255,255,255,0.042)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.028)';
     ctx.beginPath();
     for (let x = Math.floor(minX / step) * step; x <= maxX; x += step) {
       const a = projectPoint(sc.basis, vec(x, 0, minZ));
@@ -241,7 +272,7 @@
     }
     ctx.stroke();
 
-    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.07)';
     const edges = [
       [vec(minX, 0, minZ), vec(maxX, 0, minZ)],
       [vec(maxX, 0, minZ), vec(maxX, 0, maxZ)],
@@ -346,23 +377,23 @@
       else visible.push('z');
 
       function colorFor(face) {
-        if (!reachable) return face === 'top' ? 'rgb(20,20,23)' : (face === 'x' ? 'rgb(15,15,18)' : 'rgb(12,12,14)');
-        if (selected) return face === 'top' ? 'rgb(64,64,71)' : (face === 'x' ? 'rgb(40,40,46)' : 'rgb(32,32,37)');
-        if (hover) return face === 'top' ? 'rgb(48,48,54)' : (face === 'x' ? 'rgb(30,30,35)' : 'rgb(26,26,30)');
+        if (!reachable) return face === 'top' ? 'rgb(24,24,28)' : (face === 'x' ? 'rgb(17,17,21)' : 'rgb(14,14,17)');
+        if (selected) return face === 'top' ? 'rgb(82,82,90)' : (face === 'x' ? 'rgb(55,55,63)' : 'rgb(46,46,53)');
+        if (hover) return face === 'top' ? 'rgb(64,64,72)' : (face === 'x' ? 'rgb(43,43,50)' : 'rgb(36,36,42)');
         if (view.layers.phases) {
           const t = phaseT;
-          if (face === 'top') return 'rgb(' + Math.round(30 + t * 22) + ',' + Math.round(30 + t * 22) + ',' + Math.round(33 + t * 23) + ')';
-          if (face === 'x') return 'rgb(' + Math.round(20 + t * 9) + ',' + Math.round(20 + t * 9) + ',' + Math.round(23 + t * 10) + ')';
-          return 'rgb(' + Math.round(16 + t * 7) + ',' + Math.round(16 + t * 7) + ',' + Math.round(18 + t * 8) + ')';
+          if (face === 'top') return 'rgb(' + Math.round(46 + t * 20) + ',' + Math.round(46 + t * 20) + ',' + Math.round(51 + t * 21) + ')';
+          if (face === 'x') return 'rgb(' + Math.round(31 + t * 10) + ',' + Math.round(31 + t * 10) + ',' + Math.round(35 + t * 11) + ')';
+          return 'rgb(' + Math.round(25 + t * 8) + ',' + Math.round(25 + t * 8) + ',' + Math.round(28 + t * 9) + ')';
         }
-        return face === 'top' ? 'rgb(38,38,43)' : (face === 'x' ? 'rgb(25,25,29)' : 'rgb(20,20,23)');
+        return face === 'top' ? 'rgb(54,54,60)' : (face === 'x' ? 'rgb(36,36,42)' : 'rgb(29,29,34)');
       }
 
       function strokeFor(face) {
         if (selected) return { color: '#ffffff', width: 1.25 };
         if (hover) return { color: 'rgba(255,255,255,0.55)', width: 1 };
-        if (!reachable) return { color: 'rgba(255,255,255,0.08)', width: 0.7 };
-        return { color: 'rgba(255,255,255,0.17)', width: 0.7 };
+        if (!reachable) return { color: 'rgba(255,255,255,0.09)', width: 0.7 };
+        return { color: 'rgba(255,255,255,0.24)', width: 0.7 };
       }
 
       function addFace(face, points) {
@@ -573,13 +604,23 @@
     (labels || []).forEach(entry => {
       const p = entry.point;
       if (p.x < -100 || p.x > sc.W + 100 || p.y < -60 || p.y > sc.H + 60) return;
+      const title = entry.region.code + ' / ' + entry.region.name;
+      const count = String(entry.roomCount).padStart(2, '0') + ' ROOMS';
       ctx.save();
       ctx.font = '7.5px ' + FONT_MONO;
-      ctx.fillStyle = 'rgba(255,255,255,0.36)';
-      ctx.fillText(entry.region.code + ' / ' + entry.region.name, p.x + 6, p.y - 6);
-      ctx.font = '7px ' + FONT_MONO;
-      ctx.fillStyle = 'rgba(255,255,255,0.18)';
-      ctx.fillText(String(entry.roomCount).padStart(2, '0') + ' ROOMS', p.x + 6, p.y + 5);
+      const tw = ctx.measureText(title).width;
+      const cw = ctx.measureText(count).width;
+      const width = Math.max(tw, cw) + 14;
+      const height = 25;
+      ctx.fillStyle = 'rgba(8,8,10,0.78)';
+      ctx.fillRect(p.x + 4, p.y - 17, width, height);
+      ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+      ctx.strokeRect(p.x + 4.5, p.y - 16.5, width - 1, height - 1);
+      ctx.fillStyle = 'rgba(255,255,255,0.86)';
+      ctx.fillText(title, p.x + 11, p.y - 6);
+      ctx.font = '6.5px ' + FONT_MONO;
+      ctx.fillStyle = 'rgba(255,255,255,0.38)';
+      ctx.fillText(count, p.x + 11, p.y + 3);
       ctx.restore();
     });
   }
