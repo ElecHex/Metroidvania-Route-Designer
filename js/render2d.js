@@ -74,18 +74,28 @@
     const cb = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
     const dx = cb.x - ca.x;
     const dy = cb.y - ca.y;
-    if (Math.abs(dx) > Math.abs(dy)) {
-      const sx = ca.x + Math.sign(dx) * a.w / 2;
-      const ex = cb.x - Math.sign(dx) * b.w / 2;
-      if (Math.abs(ex - sx) < 8) return [{ x: ca.x, y: ca.y }, { x: cb.x, y: cb.y }];
+    const dirX = dx === 0 ? 1 : Math.sign(dx);
+    const dirY = dy === 0 ? 1 : Math.sign(dy);
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      const sx = ca.x + dirX * a.w / 2;
+      const ex = cb.x - dirX * b.w / 2;
       const mx = (sx + ex) / 2;
-      return [{ x: sx, y: ca.y }, { x: mx, y: ca.y }, { x: mx, y: cb.y }, { x: ex, y: cb.y }];
+      return [
+        { x: sx, y: ca.y },
+        { x: mx, y: ca.y },
+        { x: mx, y: cb.y },
+        { x: ex, y: cb.y }
+      ];
     }
-    const sy = ca.y + Math.sign(dy) * a.h / 2;
-    const ey = cb.y - Math.sign(dy) * b.h / 2;
-    if (Math.abs(ey - sy) < 8) return [{ x: ca.x, y: ca.y }, { x: cb.x, y: cb.y }];
+    const sy = ca.y + dirY * a.h / 2;
+    const ey = cb.y - dirY * b.h / 2;
     const my = (sy + ey) / 2;
-    return [{ x: ca.x, y: sy }, { x: ca.x, y: my }, { x: cb.x, y: my }, { x: cb.x, y: ey }];
+    return [
+      { x: ca.x, y: sy },
+      { x: ca.x, y: my },
+      { x: cb.x, y: my },
+      { x: cb.x, y: ey }
+    ];
   }
 
   function polylineLength(pts) {
@@ -222,7 +232,9 @@
         ctx.strokeStyle = t.labelStroke;
         ctx.beginPath();
         ctx.moveTo(left + 4, top + 20);
-        ctx.lineTo(p.x + 4, p.y - 5);
+        ctx.lineTo(left + 4, p.y - 8);
+        ctx.lineTo(p.x + 4, p.y - 8);
+        ctx.lineTo(p.x + 4, p.y - 4.5);
         ctx.stroke();
       }
 
@@ -629,6 +641,7 @@
     ctx.lineWidth = 1.4;
     ctx.beginPath();
     ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, a.y);
     ctx.lineTo(b.x, b.y);
     ctx.stroke();
     ctx.setLineDash([]);
