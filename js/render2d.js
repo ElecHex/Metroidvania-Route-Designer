@@ -14,11 +14,7 @@
   };
 
   function hexToRgba(hex, alpha) {
-    const h = hex.replace('#', '');
-    const n = h.length === 3
-      ? h.split('').map(c => parseInt(c + c, 16))
-      : [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
-    return 'rgba(' + n[0] + ',' + n[1] + ',' + n[2] + ',' + alpha + ')';
+    return MV.hexToRgba(hex, alpha);
   }
 
   function w2s(wx, wy, cam, W, H) {
@@ -195,7 +191,8 @@
       });
       const p = w2s(minX, minY, view.cam, W, H);
       if (p.x > W + 40 || p.y > H + 40 || w2s(maxX, maxY, view.cam, W, H).x < -40) return;
-      const tone = MV.regionTone(region.tone);
+      const regionAccent = MV.regionColor(region, view.colorMode);
+      const regionInk = t.name === 'light' ? MV.mixColor(regionAccent, t.ink, 0.32) : regionAccent;
       ctx.save();
       ctx.globalAlpha = 0.96;
       ctx.font = '9px ' + FONT_MONO;
@@ -233,10 +230,10 @@
       ctx.fillRect(left, top, totalWidth, 20);
       ctx.strokeStyle = t.labelStroke;
       ctx.strokeRect(left + 0.5, top + 0.5, totalWidth - 1, 19);
-      ctx.fillStyle = tone.color;
+      ctx.fillStyle = regionAccent;
       ctx.fillRect(left, top, 2, 20);
       ctx.font = '9px ' + FONT_MONO;
-      ctx.fillStyle = t.inkDim;
+      ctx.fillStyle = regionInk;
       ctx.fillText(region.code, p.x + 3, top + 14);
       ctx.font = '10px ' + FONT_UI;
       ctx.fillStyle = t.labelInk;
@@ -244,7 +241,7 @@
       ctx.font = '8px ' + FONT_MONO;
       ctx.fillStyle = t.inkFaint;
       ctx.fillText(countText, p.x + 3 + codeWidth + 7 + labelWidth + 8, top + 14);
-      ctx.strokeStyle = hexToRgba(tone.color, 0.18);
+      ctx.strokeStyle = MV.hexToRgba(regionAccent, 0.35);
       ctx.setLineDash([3, 5]);
       ctx.beginPath();
       ctx.moveTo(p.x, p.y - 4.5);
@@ -269,16 +266,21 @@
       const pts = world.map(p => w2s(p.x, p.y, view.cam, W, H));
       if (pts.every(p => p.x < -60 || p.x > W + 60 || p.y < -60 || p.y > H + 60)) return;
       const gate = MV.gateById(link.gate);
+      const regionOf = roomId => rooms[roomId] ? project.regions.find(region => region.id === rooms[roomId].region) : null;
+      const linkAccent = MV.regionColor(regionOf(link.b) || regionOf(link.a), view.colorMode);
+      const gateAccent = MV.gateColor(gate, view.colorMode);
+      const linkInk = t.name === 'light' ? MV.mixColor(linkAccent, t.ink, 0.5) : linkAccent;
+      const gateInk = gateAccent && t.name === 'light' ? MV.mixColor(gateAccent, t.ink, 0.35) : gateAccent;
       const selected = view.selection && view.selection.type === 'link' && view.selection.id === link.id;
       const hover = view.hover && view.hover.type === 'link' && view.hover.id === link.id;
       const isPath = pathSet.has(link.id);
       const open = analysis && analysis.openLinks ? analysis.openLinks[link.id] !== undefined : true;
 
-      let stroke = t.line;
+      let stroke = view.colorMode === 'mono' ? t.line : MV.hexToRgba(linkInk, t.name === 'light' ? 0.78 : 0.62);
       let width = 1.2;
       if (isPath) { stroke = t.lineSelected; width = 1.8; }
-      if (open === false) stroke = t.lineDim;
-      if (hover) { stroke = t.lineHover; width = 1.8; }
+      if (open === false) stroke = view.colorMode === 'mono' ? t.lineDim : MV.hexToRgba(gateInk || linkInk, 0.8);
+      if (hover) { stroke = view.colorMode === 'mono' ? t.lineHover : (gateInk || linkInk); width = 1.8; }
       if (selected) { stroke = t.lineSelected; width = 2.2; }
 
       ctx.save();
@@ -294,7 +296,7 @@
       if (link.dir !== 'both') {
         const arrowAt = pointAlong(pts, 0.68);
         const dirSign = link.dir === 'a2b' ? 1 : -1;
-        drawArrow(ctx, arrowAt, dirSign, isPath || selected ? t.accent : t.inkDim);
+        drawArrow(ctx, arrowAt, dirSign, isPath || selected ? t.accent : (gateInk || t.inkDim));
       }
 
       const badgeAt = pointAlong(pts, 0.5);
@@ -314,14 +316,16 @@
       if (!entry) return;
       if (!view.layers.gates && !(view.selection && view.selection.id === link.id)) return;
       const gate = MV.gateById(link.gate);
+      const gateAccent = MV.gateColor(gate, view.colorMode);
+      const gateText = gateAccent && t.name === 'light' ? MV.mixColor(gateAccent, t.ink, 0.38) : gateAccent;
       const selected = view.selection && view.selection.type === 'link' && view.selection.id === link.id;
       const hover = view.hover && view.hover.type === 'link' && view.hover.id === link.id;
       if (view.cam.zoom < 0.7 && !selected && !hover && entry.open) return;
       const bw = 22, bh = 14;
       const x = entry.badge.x - bw / 2, y = entry.badge.y - bh / 2;
       ctx.save();
-      ctx.fillStyle = selected || hover ? t.gateBgSelected : t.gateBg;
-      ctx.strokeStyle = selected || hover ? t.lineSelected : (entry.open ? t.gateStroke : t.gateStrokeLocked);
+      ctx.fillStyle = selected || hover ? t.gateBgSelected : (gateAccent ? MV.hexToRgba(gateAccent, 0.13) : t.gateBg);
+      ctx.strokeStyle = selected || hover ? t.lineSelected : (gateAccent ? MV.hexToRgba(gateAccent, 0.9) : (entry.open ? t.gateStroke : t.gateStrokeLocked));
       ctx.lineWidth = 1;
       if (gate.style === 'transit') ctx.setLineDash([2, 2]);
       ctx.fillRect(x, y, bw, bh);
@@ -330,7 +334,7 @@
       ctx.font = '7.5px ' + FONT_MONO;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillStyle = selected || hover ? t.gateInkSelected : (entry.open ? t.gateInk : t.gateInkLocked);
+      ctx.fillStyle = selected || hover ? t.gateInkSelected : (gateText || (entry.open ? t.gateInk : t.gateInkLocked));
       ctx.fillText(gate.code, entry.badge.x, entry.badge.y + 0.5);
       ctx.textAlign = 'left';
       ctx.textBaseline = 'alphabetic';
@@ -369,26 +373,27 @@
     ctx.restore();
   }
 
-  function drawItemGlyph(ctx, x, y, size, item) {
+  function drawItemGlyph(ctx, x, y, size, item, colorMode) {
     const t = MV.canvasTheme();
+    const accent = MV.itemColor(item, colorMode) || (item.kind === 'upgrade' ? t.itemGlyphDim : t.itemGlyph);
     const cx = x + size / 2, cy = y + size / 2;
     ctx.save();
     if (item.kind === 'key') {
-      ctx.strokeStyle = t.itemGlyph;
+      ctx.strokeStyle = accent;
       ctx.beginPath();
       ctx.arc(cx, cy, 3, 0, Math.PI * 2);
       ctx.stroke();
-      ctx.fillStyle = t.itemGlyph;
+      ctx.fillStyle = accent;
       ctx.fillRect(cx - 1, cy + 1, 2, 3);
     } else if (item.kind === 'boss') {
-      ctx.strokeStyle = t.itemGlyph;
+      ctx.strokeStyle = accent;
       ctx.lineWidth = 1.2;
       ctx.beginPath();
       ctx.moveTo(cx - 3, cy - 3); ctx.lineTo(cx + 3, cy + 3);
       ctx.moveTo(cx + 3, cy - 3); ctx.lineTo(cx - 3, cy + 3);
       ctx.stroke();
     } else if (item.kind === 'upgrade') {
-      ctx.strokeStyle = t.itemGlyphDim;
+      ctx.strokeStyle = accent;
       ctx.beginPath();
       ctx.arc(cx, cy, 3, 0, Math.PI * 2);
       ctx.stroke();
@@ -397,7 +402,7 @@
       ctx.moveTo(cx - 1.6, cy); ctx.lineTo(cx + 1.6, cy);
       ctx.stroke();
     } else {
-      ctx.fillStyle = t.itemGlyph;
+      ctx.fillStyle = accent;
       ctx.beginPath();
       ctx.moveTo(cx, cy - 3.4);
       ctx.lineTo(cx + 3.4, cy);
@@ -425,10 +430,11 @@
       const selected = view.selection && view.selection.type === 'room' && view.selection.id === room.id;
       const hover = view.hover && view.hover.type === 'room' && view.hover.id === room.id;
       const region = project.regions.find(r => r.id === room.region);
-      const regionColor = MV.regionTone(region ? region.tone : 0).color;
+      const regionAccent = MV.regionColor(region, view.colorMode);
       const phase = analysis && analysis.roomPhase ? analysis.roomPhase[room.id] : 0;
       const reachable = analysis ? analysis.reachable.includes(room.id) : true;
       const phaseT = phase === undefined ? 0 : MV.clamp(phase / maxPhase, 0, 1);
+      const phaseAccent = MV.phaseColor(project, phase === undefined ? 0 : phase, maxPhase);
       const important = selected || hover || ['hub', 'boss', 'start', 'goal'].includes(room.type);
       const detail = view.cam.zoom >= 0.44 || important;
       const compact = detail && !important && view.cam.zoom < 0.72;
@@ -436,17 +442,30 @@
 
       let fill = t.roomFill;
       if (view.layers.phases && analysis && phase !== undefined) {
-        fill = MV.hexToRgba(t.accent, 0.025 + phaseT * 0.1);
+        const alphaBase = t.name === 'light' ? 0.14 : 0.12;
+        const alphaSpan = t.name === 'light' ? 0.22 : 0.22;
+        fill = view.colorMode === 'mono'
+          ? MV.hexToRgba(t.accent, 0.025 + phaseT * 0.1)
+          : MV.hexToRgba(phaseAccent, alphaBase + phaseT * alphaSpan);
       }
       if (hover) fill = t.roomHover;
       if (selected) fill = t.roomSelected;
-      if (!reachable) fill = t.roomUnreachable;
+      if (!reachable) fill = view.colorMode === 'mono' ? t.roomUnreachable : MV.hexToRgba(phaseAccent, 0.035);
 
       ctx.save();
       ctx.beginPath();
       roundRect(ctx, p.x, p.y, w, h, 2);
       ctx.fillStyle = fill;
       ctx.fill();
+
+      if (view.colorMode !== 'mono' && reachable) {
+        ctx.fillStyle = MV.hexToRgba(regionAccent, selected ? 0.95 : 0.8);
+        ctx.fillRect(p.x + 1, p.y + 1, Math.max(0, w - 2), 2);
+        if (view.layers.phases && phase !== undefined) {
+          ctx.fillStyle = MV.hexToRgba(phaseAccent, 0.9);
+          ctx.fillRect(p.x + 1, p.y + h - 3, Math.max(0, w - 2), 2);
+        }
+      }
 
       if (room.type === 'boss') {
         ctx.save();
@@ -462,8 +481,10 @@
         ctx.restore();
       }
 
-      const borderColor = MV.blendHex(regionColor, t.ink, t.name === 'light' ? 0.45 : 0.08);
-      ctx.strokeStyle = reachable ? hexToRgba(borderColor, selected ? 0.95 : 0.58) : t.roomBorderUnreachable;
+      const borderColor = view.colorMode === 'mono'
+        ? MV.blendHex(regionAccent, t.ink, t.name === 'light' ? 0.45 : 0.08)
+        : MV.mixColor(regionAccent, t.ink, t.name === 'light' ? 0.2 : 0.05);
+      ctx.strokeStyle = reachable ? MV.hexToRgba(borderColor, selected ? 0.95 : 0.72) : t.roomBorderUnreachable;
       ctx.lineWidth = selected ? 1.5 : 1;
       if (!reachable) ctx.setLineDash([3, 3]);
       if (room.type === 'transit') ctx.setLineDash([5, 3]);
@@ -528,13 +549,14 @@
             const x = startX + i * (chip + gap);
             if (x + chip > p.x + w - pad) break;
             const itemSelected = view.selection && view.selection.type === 'item' && view.selection.id === item.id;
-            ctx.fillStyle = itemSelected ? MV.hexToRgba(t.accent, 0.16) : t.itemBg;
+            const itemAccent = MV.itemColor(item, view.colorMode);
+            ctx.fillStyle = itemSelected ? MV.hexToRgba(itemAccent || t.accent, 0.2) : t.itemBg;
             ctx.fillRect(x, y, chip, chip);
-            ctx.strokeStyle = itemSelected ? t.accent : (item.optional ? t.itemStrokeOptional : t.itemStroke);
+            ctx.strokeStyle = itemSelected ? t.accent : (itemAccent ? MV.hexToRgba(itemAccent, 0.85) : (item.optional ? t.itemStrokeOptional : t.itemStroke));
             if (item.optional && !itemSelected) ctx.setLineDash([2, 2]);
             ctx.strokeRect(x + 0.5, y + 0.5, chip - 1, chip - 1);
             ctx.setLineDash([]);
-            drawItemGlyph(ctx, x, y, chip, item);
+            drawItemGlyph(ctx, x, y, chip, item, view.colorMode);
             layoutItems[item.id] = { x, y, w: chip, h: chip, roomId: room.id };
           }
           if (overflow) {
@@ -543,7 +565,7 @@
             ctx.fillText('+' + (roomItems.length - visibleCount), p.x + w - pad - 12, y + 9.5);
           }
         } else if (roomItems.length) {
-          ctx.fillStyle = t.inkStrong;
+          ctx.fillStyle = regionAccent;
           ctx.fillRect(p.x + w - pad - 2, p.y + h - pad - 2, 3, 3);
         }
       }

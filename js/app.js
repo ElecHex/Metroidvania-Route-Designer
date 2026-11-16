@@ -15,6 +15,7 @@
     exportBtn: $('exportBtn'),
     importBtn: $('importBtn'),
     presetBtn: $('presetBtn'),
+    paletteBtn: $('paletteBtn'),
     themeBtn: $('themeBtn'),
     helpBtn: $('helpBtn'),
     toolList: $('toolList'),
@@ -49,6 +50,7 @@
     tool: 'select',
     mode: '2d',
     theme: 'dark',
+    colorMode: 'color',
     itemKind: 'ability',
     currentRegion: null,
     rightTab: 'inspect',
@@ -78,6 +80,7 @@
     MV.saveUI({
       mode: app.mode,
       theme: app.theme,
+      colorMode: app.colorMode,
       tool: app.tool,
       itemKind: app.itemKind,
       rightTab: app.rightTab,
@@ -108,6 +111,7 @@
       });
     }
     if (savedUI.mode === '3d') app.mode = '3d';
+    if (savedUI.colorMode === 'mono' || savedUI.colorMode === 'color') app.colorMode = savedUI.colorMode;
     if (['inspect', 'progress', 'guide'].includes(savedUI.rightTab)) app.rightTab = savedUI.rightTab;
     if (['ability', 'key', 'upgrade', 'boss'].includes(savedUI.itemKind)) app.itemKind = savedUI.itemKind;
     if (['select', 'room', 'connect', 'item', 'pan'].includes(savedUI.tool)) app.tool = savedUI.tool;
@@ -196,6 +200,7 @@
     els.exportBtn.addEventListener('click', exportJSON);
     els.importBtn.addEventListener('click', () => els.fileInput.click());
     els.presetBtn.addEventListener('click', openPresetModal);
+    els.paletteBtn.addEventListener('click', openPaletteModal);
     els.themeBtn.addEventListener('click', () => {
       applyTheme(app.theme === 'light' ? 'dark' : 'light', true);
     });
@@ -311,11 +316,13 @@
     app.view2d.hover = app.hover;
     app.view2d.analysis = app.analysis;
     app.view2d.tool = app.tool;
+    app.view2d.colorMode = app.colorMode;
     app.view2d.connectFrom = app.connectFrom;
     app.view3d.layers = app.layers;
     app.view3d.selection = app.selection;
     app.view3d.hover = app.hover;
     app.view3d.analysis = app.analysis;
+    app.view3d.colorMode = app.colorMode;
   }
 
   function scheduleRender() {
@@ -395,9 +402,9 @@
       : app.currentRegion;
     const html = app.project.regions.map(region => {
       const count = app.project.rooms.filter(room => room.region === region.id).length;
-      const tone = MV.regionTone(region.tone);
+      const color = MV.regionColor(region, app.colorMode);
       return `<div class="region-row ${region.id === activeRegion ? 'is-active' : ''}" data-region="${esc(region.id)}" role="button" tabindex="0" title="${esc(region.code)} / ${count} rooms">
-        <span class="region-swatch" style="background:${tone.color}"></span>
+        <span class="region-swatch" style="background:${color}"></span>
         <span class="region-name">${esc(region.name)}</span>
         <span class="region-count">${String(count).padStart(2, '0')}</span>
         <button class="region-focus" data-focus-region="${esc(region.id)}" title="聚焦区域">
@@ -610,6 +617,10 @@
           <label class="field"><span>代号</span><input data-field="code" value="${esc(region.code)}" maxlength="6"></label>
           <label class="field"><span>灰度色调</span><select data-field="tone">${MV.REGION_TONES.map(t => `<option value="${t.id}" ${t.id === region.tone ? 'selected' : ''}>TONE ${t.id} / ${t.color}</option>`).join('')}</select></label>
         </div>
+        <div class="form-grid two">
+          <label class="field"><span>区域颜色</span><input type="color" data-field="color" value="${esc(region.color)}"></label>
+          <div class="field"><span>颜色用途</span><div class="color-note">彩色模式下用于房间顶边、3D 体块、标签与连线。</div></div>
+        </div>
         ${numberField('3D 基座高度', 'elev', region.elev, 10)}
       </div>
       <p class="hint-line">区域用于给房间分组、着色和统计。新增房间会放入当前选中的区域。基座高度只影响 3D 视图，可把不同区域叠成不同楼层。</p>
@@ -793,6 +804,7 @@
       if (field === 'name') { region.name = value || '未命名区域'; return true; }
       if (field === 'code') { region.code = String(value || 'ZONE').toUpperCase().slice(0, 6); return true; }
       if (field === 'tone') { region.tone = MV.clamp(Number(value) || 0, 0, MV.REGION_TONES.length - 1); return true; }
+      if (field === 'color') { region.color = MV.normalizeHexColor(value, region.color); return true; }
       if (field === 'elev') { region.elev = MV.clamp(Number(value) || 0, -500, 500); return true; }
       return false;
     }
@@ -978,6 +990,7 @@
           <li><strong>2D 路线</strong>回答“玩家按什么顺序获得什么”，适合做锁链、钥匙预算和可选内容密度。</li>
           <li><strong>3D 地图</strong>回答“这些房间长什么样、如何垂直连接”，参考 MP1 地图的体块化读法：房间是块，连接是线，区域是底板。</li>
           <li><strong>阶段着色</strong>把可达性分析的结果投射回地图，让你一眼看到前中后期的空间分布。</li>
+          <li><strong>语义配色</strong>：区域色、阶段色、门锁色和道具色分别承载不同信息，可在配色面板中自定义。</li>
           <li><strong>主线高亮</strong>用最短路径给出终局路线骨架；它不替代完整流程，但能快速暴露“主路过长 / 主路过短 / 终局区域太早暴露”等问题。</li>
           <li><strong>门锁统计</strong>检查门锁类型是否过于单一。全图都是导弹门，会让能力节奏变得扁平。</li>
         </ul>
@@ -2085,6 +2098,146 @@
   /* ============================================================
      presets / modals
      ============================================================ */
+  const PHASE_PRESETS = {
+    spectrum: ['#6ea8fe', '#8b7cf6', '#c77dff', '#f08a5d', '#f2c94c'],
+    cool: ['#56ccf2', '#5b8def', '#7c6cf2', '#9b8cff', '#56d6c9'],
+    warm: ['#f2994a', '#eb5757', '#e07a5f', '#f2c94c', '#f7768e'],
+    earth: ['#8fbc8f', '#a3b18a', '#d4a373', '#bc6c25', '#e9c46a'],
+    neon: ['#00e5ff', '#7c4dff', '#ff2d95', '#ffb300', '#aeea00']
+  };
+
+  function setColorMode(mode) {
+    app.colorMode = mode === 'mono' ? 'mono' : 'color';
+    document.querySelectorAll('[data-color-mode]').forEach(btn => {
+      btn.classList.toggle('is-active', btn.dataset.colorMode === app.colorMode);
+    });
+    syncViews();
+    renderRegionList();
+    scheduleRender();
+    updateStatus();
+    persistUI();
+  }
+
+  function phasePreviewCss(colors) {
+    return 'linear-gradient(90deg,' + colors.join(',') + ')';
+  }
+
+  function updatePaletteModalValues() {
+    if (!app.modal) return;
+    const preview = app.modal.querySelector('#phasePreview');
+    if (preview) preview.style.background = phasePreviewCss(app.project.phaseColors);
+    app.modal.querySelectorAll('[data-phase-color]').forEach(input => {
+      const index = Number(input.dataset.phaseColor);
+      if (app.project.phaseColors[index]) input.value = app.project.phaseColors[index];
+    });
+    app.modal.querySelectorAll('[data-region-color]').forEach(input => {
+      const region = app.project.regions.find(r => r.id === input.dataset.regionColor);
+      if (region) input.value = region.color;
+    });
+    app.modal.querySelectorAll('[data-color-mode]').forEach(btn => {
+      btn.classList.toggle('is-active', btn.dataset.colorMode === app.colorMode);
+    });
+  }
+
+  function openPaletteModal() {
+    const phaseInputs = app.project.phaseColors.map((color, index) => `
+      <label class="color-chip">
+        <input type="color" data-phase-color="${index}" value="${esc(color)}" aria-label="阶段色 ${index + 1}">
+        <span>${String(index + 1).padStart(2, '0')}</span>
+      </label>`).join('');
+    const regionInputs = app.project.regions.map(region => `
+      <div class="region-color-row">
+        <span class="region-color-name"><i style="background:${MV.regionColor(region, 'color')}"></i>${esc(region.name)}</span>
+        <input type="color" data-region-color="${esc(region.id)}" value="${esc(region.color)}" aria-label="${esc(region.name)} 颜色">
+      </div>`).join('');
+    const gateLegend = MV.GATE_TYPES.filter(g => g.id !== 'open').map(g => `
+      <span class="gate-color-chip"><i style="background:${g.color}"></i>${g.code} ${esc(g.name)}</span>`).join('');
+    openModal(`<div class="modal palette-modal">
+      <div class="modal-head">
+        <div>
+          <div class="modal-kicker">PALETTE / 配色</div>
+          <h2>彩色模式与自定义颜色</h2>
+          <p>颜色不是装饰：区域、阶段、门锁和道具各自有语义。单色模式保留蓝图风格。</p>
+        </div>
+        <button class="modal-close" data-close aria-label="关闭">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="section-label">显示模式</div>
+        <div class="segmented palette-mode">
+          <button data-color-mode="color" class="${app.colorMode === 'color' ? 'is-active' : ''}">彩色</button>
+          <button data-color-mode="mono" class="${app.colorMode === 'mono' ? 'is-active' : ''}">单色</button>
+        </div>
+        <p class="hint-line">彩色模式：阶段色带用于房间与 3D 体块，区域色用于边界/顶边/标签，门锁与道具使用各自的语义色。单色模式只使用主题灰度。</p>
+
+        <div class="section-label">阶段色带</div>
+        <div class="phase-preview" id="phasePreview" style="background:${phasePreviewCss(app.project.phaseColors)}"></div>
+        <div class="phase-inputs">${phaseInputs}</div>
+        <div class="palette-presets">
+          ${Object.keys(PHASE_PRESETS).map(key => `<button class="palette-preset" data-phase-preset="${key}"><i style="background:${phasePreviewCss(PHASE_PRESETS[key])}"></i><span>${key === 'spectrum' ? '光谱' : key === 'cool' ? '冷色' : key === 'warm' ? '暖色' : key === 'earth' ? '大地' : '霓虹'}</span></button>`).join('')}
+        </div>
+
+        <div class="section-label">区域颜色</div>
+        <div class="region-color-list">${regionInputs}</div>
+
+        <div class="section-label">门锁颜色</div>
+        <div class="gate-color-legend">${gateLegend}</div>
+        <div class="btn-row">
+          <button class="btn btn-ghost" data-reset-colors>恢复默认配色</button>
+        </div>
+      </div>
+      <div class="modal-foot"><button class="btn btn-primary" data-close>完成</button></div>
+    </div>`, {
+      onMount(overlay) {
+        overlay.querySelectorAll('[data-color-mode]').forEach(btn => {
+          btn.addEventListener('click', () => setColorMode(btn.dataset.colorMode));
+        });
+        overlay.querySelectorAll('[data-phase-color]').forEach(input => {
+          input.addEventListener('input', () => {
+            beforeEdit();
+            const index = Number(input.dataset.phaseColor);
+            app.project.phaseColors[index] = MV.normalizeHexColor(input.value, app.project.phaseColors[index]);
+            updatePaletteModalValues();
+            markDirty();
+            scheduleRender();
+          });
+        });
+        overlay.querySelectorAll('[data-region-color]').forEach(input => {
+          input.addEventListener('input', () => {
+            beforeEdit();
+            const region = app.project.regions.find(r => r.id === input.dataset.regionColor);
+            if (!region) return;
+            region.color = MV.normalizeHexColor(input.value, region.color);
+            renderRegionList();
+            markDirty();
+            scheduleRender();
+          });
+        });
+        overlay.querySelectorAll('[data-phase-preset]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            beforeEdit();
+            const preset = PHASE_PRESETS[btn.dataset.phasePreset];
+            if (preset) app.project.phaseColors = preset.slice();
+            updatePaletteModalValues();
+            markDirty();
+            scheduleRender();
+          });
+        });
+        overlay.querySelector('[data-reset-colors]').addEventListener('click', () => {
+          beforeEdit();
+          app.project.phaseColors = MV.DEFAULT_PHASE_COLORS.slice();
+          app.project.regions.forEach(region => {
+            region.color = MV.REGION_COLORS[region.tone % MV.REGION_COLORS.length];
+          });
+          updatePaletteModalValues();
+          renderRegionList();
+          markDirty();
+          scheduleRender();
+          toast('配色已恢复默认');
+        });
+      }
+    });
+  }
+
   function openPresetModal() {
     const activeId = app.project.meta.preset || 'mp1';
     let selected = activeId;
@@ -2173,7 +2326,9 @@
       </div>
       <div class="modal-body">
         <div class="shortcut-grid">${rows.map(row => `<div class="shortcut-row"><span>${row[1]}</span><kbd>${row[0]}</kbd></div>`).join('')}</div>
-        <div class="section-label" style="margin-top:20px">数据</div>
+        <div class="section-label">外观与配色</div>
+        <p class="about-copy">顶栏的太阳 / 月亮按钮切换白天与黑夜主题；调色盘按钮打开配色面板，可在彩色与单色之间切换，逐段编辑阶段色带，并为每个区域单独指定颜色。彩色模式下，房间顶边表示区域、底边表示阶段，门锁与道具使用各自的语义色。</p>
+        <div class="section-label">数据</div>
         <p class="about-copy">项目自动保存在浏览器 localStorage。顶栏的保存按钮会立即写入；导出 JSON 是长期备份的可靠方式。导入时会先备份当前项目到 <span class="mono">routeforge.backup.v1</span>。PNG 导出会重新排版整张 2D 路线图，不依赖当前缩放。</p>
         <div class="section-label">预设说明</div>
         <p class="about-copy"><strong>密特罗德 Prime</strong> 预设是基于公开资料的<strong>结构化复刻</strong>，保留了区域环、Magmoor 中枢、光束门矩阵、变形球空间锁、视镜锁、环境门槛与 12 神器终局，但不保证每个房间的坐标与道具位置与官方完全一致。其余预设为压缩后的结构参考。</p>
@@ -2332,6 +2487,8 @@
     getAnalysis: () => MV.clone(app.analysis),
     getView: () => ({
       mode: app.mode,
+      theme: app.theme,
+      colorMode: app.colorMode,
       cam2d: MV.clone(app.view2d.cam),
       cam3d: MV.clone(app.view3d.cam),
       center2d: MV.clone(app.view3d.center2d),

@@ -187,12 +187,13 @@
     }
   }
 
-  function drawPlates(ctx, project, sc) {
+  function drawPlates(ctx, project, sc, view) {
     const t = MV.canvasTheme();
     const labels = [];
     (project.regions || []).forEach(region => {
       const regionRooms = (project.rooms || []).filter(room => room.region === region.id);
       if (!regionRooms.length) return;
+      const regionAccent = MV.regionColor(region, view.colorMode);
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
       regionRooms.forEach(room => {
         minX = Math.min(minX, room.x);
@@ -214,9 +215,9 @@
       ctx.beginPath();
       corners.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
       ctx.closePath();
-      ctx.fillStyle = t.plateFill;
+      ctx.fillStyle = view.colorMode === 'mono' ? t.plateFill : MV.hexToRgba(regionAccent, 0.035);
       ctx.fill();
-      ctx.strokeStyle = t.plateStroke;
+      ctx.strokeStyle = view.colorMode === 'mono' ? t.plateStroke : MV.hexToRgba(regionAccent, 0.26);
       ctx.lineWidth = 1;
       ctx.setLineDash([3, 5]);
       ctx.stroke();
@@ -237,7 +238,7 @@
         ctx.setLineDash([]);
       }
       ctx.restore();
-      labels.push({ region, point: corners[0], roomCount: regionRooms.length });
+      labels.push({ region, point: corners[0], roomCount: regionRooms.length, accent: regionAccent });
     });
     return labels;
   }
@@ -309,11 +310,12 @@
       const pb = projectPoint(sc.basis, vec(b.cx, b.base + b.height * 0.34, b.cz));
       if (!pa || !pb) return;
       const gate = MV.gateById(link.gate);
+      const gateAccent = MV.gateColor(gate, view.colorMode);
       const isPath = pathSet.has(link.id);
-      let stroke = t.line;
+      let stroke = view.colorMode === 'mono' ? t.line : MV.hexToRgba(gateAccent || t.line, 0.5);
       let width = 1;
-      if (isPath) { stroke = MV.hexToRgba(t.accent, 0.32); width = 1.3; }
-      if (highlightedOnly) { stroke = t.accent; width = 1.4; }
+      if (isPath) { stroke = MV.hexToRgba(t.accent, 0.45); width = 1.3; }
+      if (highlightedOnly) { stroke = gateAccent || t.accent; width = 1.4; }
       ctx.save();
       ctx.strokeStyle = stroke;
       ctx.lineWidth = width;
@@ -347,7 +349,7 @@
         ctx.fillStyle = t.labelBg;
         const tw = ctx.measureText(gate.code).width;
         ctx.fillRect(mx - tw / 2 - 3, my - 8, tw + 6, 12);
-        ctx.fillStyle = highlightedOnly ? t.inkStrong : t.inkDim;
+        ctx.fillStyle = gateAccent || (highlightedOnly ? t.inkStrong : t.inkDim);
         ctx.fillText(gate.code, mx, my + 1);
         ctx.textAlign = 'left';
       }
@@ -364,8 +366,11 @@
 
     boxes.forEach(box => {
       const room = box.room;
+      const region = project.regions.find(r => r.id === room.region);
+      const regionAccent = MV.regionColor(region, view.colorMode);
       const phase = view.analysis && view.analysis.roomPhase ? view.analysis.roomPhase[room.id] : 0;
       const phaseT = phase === undefined ? 0 : clamp(phase / maxPhase, 0, 1);
+      const phaseAccent = MV.phaseColor(project, phase === undefined ? 0 : phase, maxPhase);
       const reachable = view.analysis ? view.analysis.reachable.includes(room.id) : true;
       const selected = view.selection && view.selection.type === 'room' && view.selection.id === room.id;
       const hover = view.hover && view.hover.type === 'room' && view.hover.id === room.id;
@@ -381,13 +386,20 @@
         if (!reachable) return face === 'top' ? t.boxTopUnreachable : (face === 'x' ? t.boxXUnreachable : t.boxZUnreachable);
         if (selected) return face === 'top' ? t.boxTopSelected : (face === 'x' ? t.boxXSelected : t.boxZSelected);
         if (hover) return face === 'top' ? t.boxTopHover : (face === 'x' ? t.boxXHover : t.boxZHover);
-        return face === 'top' ? t.boxTop : (face === 'x' ? t.boxX : t.boxZ);
+        const base = face === 'top' ? t.boxTop : (face === 'x' ? t.boxX : t.boxZ);
+        if (view.colorMode === 'mono') return base;
+        const regionMix = face === 'top' ? 0.28 : (face === 'x' ? 0.18 : 0.13);
+        const phaseMix = face === 'top' ? 0.1 + phaseT * 0.08 : 0.05 + phaseT * 0.05;
+        return MV.mixColor(MV.mixColor(base, regionAccent, regionMix), phaseAccent, phaseMix);
       }
 
       function strokeFor(face) {
         if (selected) return { color: t.accent, width: 1.25 };
         if (hover) return { color: t.boxStrokeHover, width: 1 };
         if (!reachable) return { color: t.boxStrokeUnreachable, width: 0.7 };
+        if (view.colorMode !== 'mono' && face === 'top') {
+          return { color: MV.hexToRgba(regionAccent, t.name === 'light' ? 0.55 : 0.45), width: 0.85 };
+        }
         return { color: t.boxStroke, width: 0.7 };
       }
 
@@ -516,10 +528,11 @@
       const p = projectPoint(sc.basis, vec(box.cx, box.top + 0.25, box.cz));
       if (!p) return;
       const selected = view.selection && view.selection.type === 'room' && view.selection.id === roomId;
+      const itemAccent = MV.itemColor(items[0], view.colorMode);
       ctx.save();
       ctx.translate(p.x, p.y);
       ctx.rotate(Math.PI / 4);
-      ctx.strokeStyle = selected ? t.accent : t.inkDim;
+      ctx.strokeStyle = selected ? t.accent : (itemAccent || t.inkDim);
       ctx.lineWidth = 1;
       ctx.strokeRect(-2.5, -2.5, 5, 5);
       ctx.restore();
@@ -602,20 +615,27 @@
     (labels || []).forEach(entry => {
       const p = entry.point;
       if (p.x < -100 || p.x > sc.W + 100 || p.y < -60 || p.y > sc.H + 60) return;
-      const title = entry.region.code + ' / ' + entry.region.name;
+      const accent = t.name === 'light' ? MV.mixColor(entry.accent || t.threeLabelInk, t.ink, 0.3) : (entry.accent || t.threeLabelInk);
       const count = String(entry.roomCount).padStart(2, '0') + ' ROOMS';
       ctx.save();
       ctx.font = '7.5px ' + FONT_MONO;
-      const tw = ctx.measureText(title).width;
-      const cw = ctx.measureText(count).width;
-      const width = Math.max(tw, cw) + 14;
+      const codeWidth = ctx.measureText(entry.region.code).width;
+      ctx.font = '7.5px ' + FONT_UI;
+      const nameWidth = ctx.measureText(' / ' + entry.region.name).width;
+      ctx.font = '7.5px ' + FONT_MONO;
+      const width = 11 + codeWidth + nameWidth + 8;
       const height = 25;
       ctx.fillStyle = t.threeLabelBg;
       ctx.fillRect(p.x + 4, p.y - 17, width, height);
       ctx.strokeStyle = t.threeLabelStroke;
       ctx.strokeRect(p.x + 4.5, p.y - 16.5, width - 1, height - 1);
+      ctx.fillStyle = accent;
+      ctx.fillRect(p.x + 4, p.y - 17, 2, height);
+      ctx.fillStyle = accent;
+      ctx.fillText(entry.region.code, p.x + 11, p.y - 6);
+      ctx.font = '7.5px ' + FONT_UI;
       ctx.fillStyle = t.threeLabelInk;
-      ctx.fillText(title, p.x + 11, p.y - 6);
+      ctx.fillText(' / ' + entry.region.name, p.x + 12 + ctx.measureText(entry.region.code).width, p.y - 6);
       ctx.font = '6.5px ' + FONT_MONO;
       ctx.fillStyle = t.threeLabelInkDim;
       ctx.fillText(count, p.x + 11, p.y + 3);
@@ -656,7 +676,7 @@
   function drawScene(ctx, W, H, project, view) {
     drawBackground(ctx, W, H);
     const sc = sceneFor(project, W, H, view.cam, view.center2d);
-    const plates = drawPlates(ctx, project, sc);
+    const plates = drawPlates(ctx, project, sc, view);
     drawGrid(ctx, project, sc);
     drawLinks(ctx, project, view, sc, false);
     drawBoxes(ctx, project, view, sc);

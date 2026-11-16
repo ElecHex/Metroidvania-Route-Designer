@@ -30,38 +30,44 @@
     { id: 'goal', name: '终点 / 决战', code: 'GOAL', height: 72, depth: 64 }
   ];
 
+  const REGION_COLORS = [
+    '#e05a5a', '#d5a34a', '#5fbf8a', '#d7b35a',
+    '#a77bd6', '#58b4e8', '#8797b8', '#d9d9d9'
+  ];
+  const DEFAULT_PHASE_COLORS = ['#6ea8fe', '#8b7cf6', '#c77dff', '#f08a5d', '#f2c94c'];
+
   /* Gate presets are Metroid Prime-flavoured. Any link can override its
      requirements, so the same tool also supports other metroidvanias. */
   const GATE_TYPES = [
-    { id: 'open', name: '无锁通道', code: '--', requires: [], keyReq: 0, style: 'open', desc: '普通门或开放通道。' },
-    { id: 'missile', name: '导弹门', code: 'MS', requires: ['missile'], keyReq: 0, style: 'door', desc: '需要导弹发射器。' },
-    { id: 'ice', name: '冰冻门', code: 'IC', requires: ['iceBeam'], keyReq: 0, style: 'door', desc: '需要冰冻光束。' },
-    { id: 'wave', name: '波导门', code: 'WV', requires: ['waveBeam'], keyReq: 0, style: 'door', desc: '需要波导光束。' },
-    { id: 'plasma', name: '等离子门', code: 'PL', requires: ['plasmaBeam'], keyReq: 0, style: 'door', desc: '需要等离子光束。' },
-    { id: 'morph', name: '变形球通道', code: 'MB', requires: ['morphBall'], keyReq: 0, style: 'morph', desc: '只有变形球能通过。' },
-    { id: 'bomb', name: '炸弹槽', code: 'BM', requires: ['morphBall', 'bomb'], keyReq: 0, style: 'morph', desc: '需要变形球炸弹触发机关。' },
-    { id: 'boost', name: '加速球半管', code: 'BO', requires: ['morphBall', 'boostBall'], keyReq: 0, style: 'morph', desc: '需要加速球冲上半管。' },
-    { id: 'spider', name: '蜘蛛球轨道', code: 'SP', requires: ['morphBall', 'spiderBall'], keyReq: 0, style: 'morph', desc: '需要蜘蛛球磁轨。' },
-    { id: 'grapple', name: '抓钩点', code: 'GR', requires: ['grappleBeam'], keyReq: 0, style: 'traversal', desc: '需要抓钩光束跨越。' },
-    { id: 'powerbomb', name: '强力炸弹墙', code: 'PB', requires: ['powerBomb'], keyReq: 0, style: 'door', desc: '需要强力炸弹破坏。' },
-    { id: 'scan', name: '扫描终端', code: 'SC', requires: ['scanVisor'], keyReq: 0, style: 'tech', desc: '需要扫描视镜激活。' },
-    { id: 'thermal', name: '热能视镜锁', code: 'TH', requires: ['thermalVisor'], keyReq: 0, style: 'tech', desc: '需要热能视镜看见隐藏结构。' },
-    { id: 'xray', name: 'X 光视镜锁', code: 'XR', requires: ['xRayVisor'], keyReq: 0, style: 'tech', desc: '需要 X 光视镜识别隐形路径。' },
-    { id: 'heat', name: '高温区', code: 'HT', requires: ['variaSuit'], keyReq: 0, style: 'hazard', desc: '需要瓦利亚服抵抗高温。' },
-    { id: 'water', name: '深水区', code: 'WT', requires: ['gravitySuit'], keyReq: 0, style: 'hazard', desc: '需要重力服在水中行动。' },
-    { id: 'phazon', name: 'Phazon 污染', code: 'PH', requires: ['phazonSuit'], keyReq: 0, style: 'hazard', desc: '需要 Phazon 服才能通过。' },
-    { id: 'artifact', name: '钥匙 / 神器封印', code: 'KY', requires: [], keyReq: 1, style: 'seal', desc: '消耗或要求若干钥匙 / 神器。' },
-    { id: 'ability', name: '自定义能力锁', code: 'AB', requires: [], keyReq: 0, style: 'custom', desc: '在检查器中勾选任意能力需求。' },
-    { id: 'hazard', name: '自定义环境锁', code: 'HZ', requires: [], keyReq: 0, style: 'hazard', desc: '自定义环境或状态门槛。' },
-    { id: 'boss', name: 'Boss 守门', code: 'BS', requires: [], keyReq: 0, style: 'custom', desc: 'Boss 战后开放；需求可自定义。' },
-    { id: 'elevator', name: '区域升降机', code: 'EL', requires: [], keyReq: 0, style: 'transit', desc: '区域间换乘，通常无门槛。' }
+    { id: 'open', name: '无锁通道', code: '--', requires: [], keyReq: 0, style: 'open', color: '#9aa0aa', desc: '普通门或开放通道。' },
+    { id: 'missile', name: '导弹门', code: 'MS', requires: ['missile'], keyReq: 0, style: 'door', color: '#e76f51', desc: '需要导弹发射器。' },
+    { id: 'ice', name: '冰冻门', code: 'IC', requires: ['iceBeam'], keyReq: 0, style: 'door', color: '#6ec6ff', desc: '需要冰冻光束。' },
+    { id: 'wave', name: '波导门', code: 'WV', requires: ['waveBeam'], keyReq: 0, style: 'door', color: '#b388ff', desc: '需要波导光束。' },
+    { id: 'plasma', name: '等离子门', code: 'PL', requires: ['plasmaBeam'], keyReq: 0, style: 'door', color: '#ff5c8a', desc: '需要等离子光束。' },
+    { id: 'morph', name: '变形球通道', code: 'MB', requires: ['morphBall'], keyReq: 0, style: 'morph', color: '#7bd88f', desc: '只有变形球能通过。' },
+    { id: 'bomb', name: '炸弹槽', code: 'BM', requires: ['morphBall', 'bomb'], keyReq: 0, style: 'morph', color: '#f4a261', desc: '需要变形球炸弹触发机关。' },
+    { id: 'boost', name: '加速球半管', code: 'BO', requires: ['morphBall', 'boostBall'], keyReq: 0, style: 'morph', color: '#f6c85f', desc: '需要加速球冲上半管。' },
+    { id: 'spider', name: '蜘蛛球轨道', code: 'SP', requires: ['morphBall', 'spiderBall'], keyReq: 0, style: 'morph', color: '#4dd0c4', desc: '需要蜘蛛球磁轨。' },
+    { id: 'grapple', name: '抓钩点', code: 'GR', requires: ['grappleBeam'], keyReq: 0, style: 'traversal', color: '#9ccc65', desc: '需要抓钩光束跨越。' },
+    { id: 'powerbomb', name: '强力炸弹墙', code: 'PB', requires: ['powerBomb'], keyReq: 0, style: 'door', color: '#ff8c42', desc: '需要强力炸弹破坏。' },
+    { id: 'scan', name: '扫描终端', code: 'SC', requires: ['scanVisor'], keyReq: 0, style: 'tech', color: '#64b5f6', desc: '需要扫描视镜激活。' },
+    { id: 'thermal', name: '热能视镜锁', code: 'TH', requires: ['thermalVisor'], keyReq: 0, style: 'tech', color: '#ff7043', desc: '需要热能视镜看见隐藏结构。' },
+    { id: 'xray', name: 'X 光视镜锁', code: 'XR', requires: ['xRayVisor'], keyReq: 0, style: 'tech', color: '#ba68c8', desc: '需要 X 光视镜识别隐形路径。' },
+    { id: 'heat', name: '高温区', code: 'HT', requires: ['variaSuit'], keyReq: 0, style: 'hazard', color: '#ef5350', desc: '需要瓦利亚服抵抗高温。' },
+    { id: 'water', name: '深水区', code: 'WT', requires: ['gravitySuit'], keyReq: 0, style: 'hazard', color: '#42a5f5', desc: '需要重力服在水中行动。' },
+    { id: 'phazon', name: 'Phazon 污染', code: 'PH', requires: ['phazonSuit'], keyReq: 0, style: 'hazard', color: '#aeea00', desc: '需要 Phazon 服才能通过。' },
+    { id: 'artifact', name: '钥匙 / 神器封印', code: 'KY', requires: [], keyReq: 1, style: 'seal', color: '#ffd54f', desc: '消耗或要求若干钥匙 / 神器。' },
+    { id: 'ability', name: '自定义能力锁', code: 'AB', requires: [], keyReq: 0, style: 'custom', color: '#c7a6ff', desc: '在检查器中勾选任意能力需求。' },
+    { id: 'hazard', name: '自定义环境锁', code: 'HZ', requires: [], keyReq: 0, style: 'hazard', color: '#ffb74d', desc: '自定义环境或状态门槛。' },
+    { id: 'boss', name: 'Boss 守门', code: 'BS', requires: [], keyReq: 0, style: 'custom', color: '#ef5350', desc: 'Boss 战后开放；需求可自定义。' },
+    { id: 'elevator', name: '区域升降机', code: 'EL', requires: [], keyReq: 0, style: 'transit', color: '#90a4ae', desc: '区域间换乘，通常无门槛。' }
   ];
 
   const ITEM_KINDS = [
-    { id: 'ability', name: '能力道具', code: 'ABILITY', short: 'AB' },
-    { id: 'key', name: '钥匙 / 神器', code: 'KEY', short: 'KY' },
-    { id: 'upgrade', name: '可选强化', code: 'UPGRADE', short: 'UP' },
-    { id: 'boss', name: 'Boss / 事件', code: 'BOSS', short: 'BS' }
+    { id: 'ability', name: '能力道具', code: 'ABILITY', short: 'AB', color: '#64b5f6' },
+    { id: 'key', name: '钥匙 / 神器', code: 'KEY', short: 'KY', color: '#ffd54f' },
+    { id: 'upgrade', name: '可选强化', code: 'UPGRADE', short: 'UP', color: '#4db6ac' },
+    { id: 'boss', name: 'Boss / 事件', code: 'BOSS', short: 'BS', color: '#ef5350' }
   ];
 
   const DOUBLE_LINK = 'both';
@@ -265,6 +271,65 @@
     return Math.max(min, Math.min(max, value));
   }
 
+  function normalizeHexColor(value, fallback) {
+    const text = String(value || '').trim();
+    if (/^#[0-9a-fA-F]{6}$/.test(text)) return text.toLowerCase();
+    if (/^#[0-9a-fA-F]{3}$/.test(text)) {
+      return ('#' + text.slice(1).split('').map(c => c + c).join('')).toLowerCase();
+    }
+    return fallback === undefined ? '#9aa0aa' : fallback;
+  }
+
+  function parseColor(value) {
+    if (typeof value !== 'string') return null;
+    const text = value.trim();
+    if (text[0] === '#') {
+      const hex = normalizeHexColor(text, null);
+      if (!hex) return null;
+      return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+    }
+    const match = text.match(/^rgba?\(([^)]+)\)$/i);
+    if (!match) return null;
+    const parts = match[1].split(',').map(part => Number(part.trim()));
+    if (parts.length < 3 || parts.some(n => !Number.isFinite(n))) return null;
+    return [parts[0], parts[1], parts[2]];
+  }
+
+  function mixColor(a, b, t) {
+    const ca = parseColor(a), cb = parseColor(b);
+    if (!ca || !cb) return a;
+    const k = clamp(Number(t) || 0, 0, 1);
+    return 'rgb(' + ca.map((v, i) => Math.round(v + (cb[i] - v) * k)).join(',') + ')';
+  }
+
+  function regionColor(region, colorMode) {
+    if (!region) return '#9aa0aa';
+    if (colorMode === 'mono') return regionTone(region.tone).color;
+    return normalizeHexColor(region.color, REGION_COLORS[(Number(region.tone) || 0) % REGION_COLORS.length]);
+  }
+
+  function phaseColor(project, phase, maxPhase) {
+    const colors = (project && Array.isArray(project.phaseColors) && project.phaseColors.length >= 2)
+      ? project.phaseColors
+      : DEFAULT_PHASE_COLORS;
+    const max = Math.max(1, Number(maxPhase) || 1);
+    const t = clamp((Number(phase) || 0) / max, 0, 1);
+    const scaled = t * (colors.length - 1);
+    const index = Math.min(colors.length - 2, Math.floor(scaled));
+    return blendHex(colors[index], colors[index + 1], scaled - index);
+  }
+
+  function gateColor(gate, colorMode) {
+    if (colorMode === 'mono') return null;
+    return normalizeHexColor(gate && gate.color, '#9aa0aa');
+  }
+
+  function itemColor(item, colorMode) {
+    if (colorMode === 'mono') return null;
+    const kind = ITEM_KINDS.find(k => k.id === (item && item.kind));
+    return kind ? kind.color : '#9aa0aa';
+  }
+
   function escapeHtml(value) {
     return String(value == null ? '' : value)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -425,18 +490,31 @@
       ? project.startAbilities.filter(id => project.abilities.some(a => a.id === id))
       : [];
 
+    const incomingPhaseColors = Array.isArray(input.phaseColors) ? input.phaseColors : [];
+    project.phaseColors = incomingPhaseColors
+      .map(color => normalizeHexColor(color, null))
+      .filter(Boolean);
+    if (project.phaseColors.length < 2) project.phaseColors = DEFAULT_PHASE_COLORS.slice();
+
     project.regions = Array.isArray(project.regions) ? project.regions : [];
     project.regions = project.regions
       .filter(r => r && r.id)
-      .map(r => ({
-        id: String(r.id),
-        name: String(r.name || '未命名区域'),
-        code: String(r.code || 'ZONE').toUpperCase().slice(0, 6),
-        tone: clamp(Number(r.tone) || 0, 0, REGION_TONES.length - 1),
-        elev: clamp(Number(r.elev) || 0, -500, 500)
-      }));
+      .map(r => {
+        const tone = clamp(Number(r.tone) || 0, 0, REGION_TONES.length - 1);
+        return {
+          id: String(r.id),
+          name: String(r.name || '未命名区域'),
+          code: String(r.code || 'ZONE').toUpperCase().slice(0, 6),
+          tone: tone,
+          elev: clamp(Number(r.elev) || 0, -500, 500),
+          color: normalizeHexColor(r.color, REGION_COLORS[tone % REGION_COLORS.length])
+        };
+      });
     if (!project.regions.length) {
-      project.regions = [{ id: 'region_1', name: '新区域', code: 'ZONE', tone: 1, elev: 0 }];
+      project.regions = [{
+        id: 'region_1', name: '新区域', code: 'ZONE', tone: 1, elev: 0,
+        color: REGION_COLORS[1]
+      }];
     }
 
     const regionIds = new Set(project.regions.map(r => r.id));
@@ -582,6 +660,8 @@
     STORAGE_KEY,
     UI_KEY,
     REGION_TONES,
+    REGION_COLORS,
+    DEFAULT_PHASE_COLORS,
     ROOM_TYPES,
     GATE_TYPES,
     ITEM_KINDS,
@@ -591,6 +671,12 @@
     uid,
     clone,
     clamp,
+    normalizeHexColor,
+    mixColor,
+    regionColor,
+    phaseColor,
+    gateColor,
+    itemColor,
     escapeHtml,
     slugify,
     formatTime,
