@@ -237,6 +237,43 @@
   };
 
   let activeThemeName = 'dark';
+  let uiFontScale = 1.15;
+
+  function setFontScale(value) {
+    uiFontScale = clamp(Number(value) || 1.15, 0.9, 1.6);
+    return uiFontScale;
+  }
+  function fontScale() {
+    return uiFontScale;
+  }
+
+  /* Scale every canvas font string once, globally, so renderers keep their
+     existing typographic code while the UI font-size control affects Canvas. */
+  function installCanvasFontScale() {
+    if (typeof CanvasRenderingContext2D === 'undefined') return;
+    if (CanvasRenderingContext2D.prototype.__routeForgeFontPatched) return;
+    const descriptor = Object.getOwnPropertyDescriptor(CanvasRenderingContext2D.prototype, 'font');
+    if (!descriptor || !descriptor.set) return;
+    try {
+      Object.defineProperty(CanvasRenderingContext2D.prototype, 'font', {
+        configurable: true,
+        enumerable: descriptor.enumerable,
+        get: descriptor.get,
+        set: function (value) {
+          const text = String(value);
+          const scaled = text.replace(/(\d+(?:\.\d+)?)px/g, (match, size) => {
+            return (Number(size) * uiFontScale).toFixed(2) + 'px';
+          });
+          descriptor.set.call(this, scaled);
+        }
+      });
+      CanvasRenderingContext2D.prototype.__routeForgeFontPatched = true;
+    } catch (err) {
+      console.warn('Route Forge: canvas font scaling unavailable', err);
+    }
+  }
+
+  installCanvasFontScale();
 
   function setCanvasTheme(name) {
     activeThemeName = name === 'light' ? 'light' : 'dark';
@@ -706,6 +743,8 @@
     saveUI,
     setCanvasTheme,
     canvasTheme,
+    setFontScale,
+    fontScale,
     hexToRgba,
     blendHex,
     History

@@ -25,6 +25,7 @@
     regionSummary: $('regionSummary'),
     regionList: $('regionList'),
     layerList: $('layerList'),
+    fontSizeControl: $('fontSizeControl'),
     exportPngBtn: $('exportPngBtn'),
     stage2d: $('stage2d'),
     stage3d: $('stage3d'),
@@ -56,6 +57,7 @@
     mode: '2d',
     theme: 'dark',
     colorMode: 'color',
+    fontScale: 1.15,
     hiddenRegions: new Set(),
     itemKind: 'ability',
     currentRegion: null,
@@ -96,6 +98,7 @@
       tool: app.tool,
       itemKind: app.itemKind,
       rightTab: app.rightTab,
+      fontScale: app.fontScale,
       layers: app.layers,
       hiddenRegions: Array.from(app.hiddenRegions),
       currentRegion: app.currentRegion,
@@ -120,6 +123,9 @@
     const savedUI = MV.loadUI() || {};
     app.theme = savedUI.theme === 'light' ? 'light' : 'dark';
     applyTheme(app.theme, false);
+    const savedScale = Number(savedUI.fontScale);
+    app.fontScale = savedScale >= 1 && savedScale <= 1.5 ? savedScale : 1.15;
+    applyFontScale(app.fontScale, false);
     if (savedUI.layers && typeof savedUI.layers === 'object') {
       Object.keys(app.layers).forEach(key => {
         if (typeof savedUI.layers[key] === 'boolean') app.layers[key] = savedUI.layers[key];
@@ -283,6 +289,11 @@
       syncViews();
       scheduleRender();
       persistUI();
+    });
+    els.fontSizeControl.addEventListener('click', e => {
+      const btn = e.target.closest('[data-font-scale]');
+      if (!btn) return;
+      applyFontScale(Number(btn.dataset.fontScale), true);
     });
 
     document.querySelectorAll('[data-zoom]').forEach(btn => {
@@ -853,9 +864,9 @@
       { text: errors ? errors + ' ERRORS' : 'STRUCTURE OK', solid: true }
     ])}
       <div class="stat-grid">
-        <div class="stat-cell"><div class="s-label">REACHABLE</div><div class="s-value">${app.analysis.stats.reachableRooms}<span style="font-size:11px;color:var(--ink-4)"> / ${counts.rooms}</span></div><div class="s-sub">从起点可达的房间</div></div>
-        <div class="stat-cell"><div class="s-label">KEYS</div><div class="s-value">${app.analysis.keys}<span style="font-size:11px;color:var(--ink-4)"> / ${app.analysis.keysTotal}</span></div><div class="s-sub">已收集 / 全图钥匙</div></div>
-        <div class="stat-cell"><div class="s-label">GATES</div><div class="s-value">${app.analysis.openCount}<span style="font-size:11px;color:var(--ink-4)"> / ${counts.links}</span></div><div class="s-sub">可通行 / 全部门锁</div></div>
+        <div class="stat-cell"><div class="s-label">REACHABLE</div><div class="s-value">${app.analysis.stats.reachableRooms}<span style="font-size:calc(11px * var(--font-scale));color:var(--ink-4)"> / ${counts.rooms}</span></div><div class="s-sub">从起点可达的房间</div></div>
+        <div class="stat-cell"><div class="s-label">KEYS</div><div class="s-value">${app.analysis.keys}<span style="font-size:calc(11px * var(--font-scale));color:var(--ink-4)"> / ${app.analysis.keysTotal}</span></div><div class="s-sub">已收集 / 全图钥匙</div></div>
+        <div class="stat-cell"><div class="s-label">GATES</div><div class="s-value">${app.analysis.openCount}<span style="font-size:calc(11px * var(--font-scale));color:var(--ink-4)"> / ${counts.links}</span></div><div class="s-sub">可通行 / 全部门锁</div></div>
         <div class="stat-cell"><div class="s-label">ITEMS</div><div class="s-value">${counts.items}</div><div class="s-sub">${counts.optional} 个可选 / ${counts.bosses} 个 Boss</div></div>
       </div>
       <div class="form-grid">
@@ -1127,10 +1138,10 @@
         <div class="ps-sub">${a.goalReached ? '终点可达 · 主线 ' + a.path.length + ' 个房间 · ' + (a.goalReachedStep + 1) + ' 个阶段' : '从起点无法抵达终点，见下方警告。'}</div>
       </div>
       <div class="stat-grid">
-        <div class="stat-cell"><div class="s-label">REACHABLE ROOMS</div><div class="s-value">${a.stats.reachableRooms}<span style="font-size:11px;color:var(--ink-4)"> / ${a.stats.rooms}</span></div><div class="bar"><i style="width:${a.stats.rooms ? a.stats.reachableRooms / a.stats.rooms * 100 : 0}%"></i></div></div>
-        <div class="stat-cell"><div class="s-label">OPEN GATES</div><div class="s-value">${a.openCount}<span style="font-size:11px;color:var(--ink-4)"> / ${a.totalLinks}</span></div><div class="bar"><i style="width:${a.totalLinks ? a.openCount / a.totalLinks * 100 : 0}%"></i></div></div>
-        <div class="stat-cell"><div class="s-label">KEYS</div><div class="s-value">${a.keys}<span style="font-size:11px;color:var(--ink-4)"> / ${a.keysTotal}</span></div><div class="bar"><i style="width:${a.keysTotal ? a.keys / a.keysTotal * 100 : 0}%"></i></div></div>
-        <div class="stat-cell"><div class="s-label">ACQUIRED</div><div class="s-value">${a.stats.collectedItems}<span style="font-size:11px;color:var(--ink-4)"> / ${a.stats.items}</span></div><div class="bar"><i style="width:${a.stats.items ? a.stats.collectedItems / a.stats.items * 100 : 0}%"></i></div></div>
+        <div class="stat-cell"><div class="s-label">REACHABLE ROOMS</div><div class="s-value">${a.stats.reachableRooms}<span style="font-size:calc(11px * var(--font-scale));color:var(--ink-4)"> / ${a.stats.rooms}</span></div><div class="bar"><i style="width:${a.stats.rooms ? a.stats.reachableRooms / a.stats.rooms * 100 : 0}%"></i></div></div>
+        <div class="stat-cell"><div class="s-label">OPEN GATES</div><div class="s-value">${a.openCount}<span style="font-size:calc(11px * var(--font-scale));color:var(--ink-4)"> / ${a.totalLinks}</span></div><div class="bar"><i style="width:${a.totalLinks ? a.openCount / a.totalLinks * 100 : 0}%"></i></div></div>
+        <div class="stat-cell"><div class="s-label">KEYS</div><div class="s-value">${a.keys}<span style="font-size:calc(11px * var(--font-scale));color:var(--ink-4)"> / ${a.keysTotal}</span></div><div class="bar"><i style="width:${a.keysTotal ? a.keys / a.keysTotal * 100 : 0}%"></i></div></div>
+        <div class="stat-cell"><div class="s-label">ACQUIRED</div><div class="s-value">${a.stats.collectedItems}<span style="font-size:calc(11px * var(--font-scale));color:var(--ink-4)"> / ${a.stats.items}</span></div><div class="bar"><i style="width:${a.stats.items ? a.stats.collectedItems / a.stats.items * 100 : 0}%"></i></div></div>
       </div>
       <div class="section-label">警告</div>
       <div class="warn-list">${warningsHTML}</div>
@@ -1746,6 +1757,21 @@
     }
     if (app.view2d && app.view3d) scheduleRender();
     if (persist) persistUI();
+  }
+
+  function applyFontScale(scale, persist) {
+    const value = MV.clamp(Number(scale) || 1.15, 1, 1.5);
+    app.fontScale = value;
+    document.documentElement.style.setProperty('--font-scale', String(value));
+    MV.setFontScale(value);
+    document.querySelectorAll('[data-font-scale]').forEach(btn => {
+      btn.classList.toggle('is-active', Math.abs(Number(btn.dataset.fontScale) - value) < 0.01);
+    });
+    if (app.view2d && app.view3d) scheduleRender();
+    if (persist) {
+      persistUI();
+      toast('字体大小：' + Math.round(value * 100) + '%');
+    }
   }
 
   function switchMode(mode) {
