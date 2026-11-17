@@ -21,10 +21,12 @@
     toolList: $('toolList'),
     itemKindSeg: $('itemKindSeg'),
     addRegionBtn: $('addRegionBtn'),
+    jumpBtn: $('jumpBtn'),
     showAllRegionsBtn: $('showAllRegionsBtn'),
     regionSummary: $('regionSummary'),
     regionList: $('regionList'),
     layerList: $('layerList'),
+    snapToggle: $('snapToggle'),
     fontSizeControl: $('fontSizeControl'),
     exportPngBtn: $('exportPngBtn'),
     stage2d: $('stage2d'),
@@ -62,6 +64,8 @@
     itemKind: 'ability',
     currentRegion: null,
     rightTab: 'inspect',
+    lastPanelKey: null,
+    snap: true,
     layers: {
       gates: true, items: true, regions: true, path: true,
       phases: true, grid: true, names: true
@@ -90,6 +94,7 @@
   };
 
   let toastTimer = null;
+  let roomClipboard = null;
   const persistUI = MV.debounce(() => {
     MV.saveUI({
       mode: app.mode,
@@ -99,6 +104,7 @@
       itemKind: app.itemKind,
       rightTab: app.rightTab,
       fontScale: app.fontScale,
+      snap: app.snap,
       layers: app.layers,
       hiddenRegions: Array.from(app.hiddenRegions),
       currentRegion: app.currentRegion,
@@ -116,6 +122,16 @@
     updateSaveState();
   }, 550);
 
+  function flushAutosave() {
+    if (!app.dirty) return;
+    const ts = MV.saveProject(app.project);
+    if (ts) {
+      app.lastSaved = ts;
+      app.dirty = false;
+      updateSaveState();
+    }
+  }
+
   /* ============================================================
      boot
      ============================================================ */
@@ -125,7 +141,9 @@
     applyTheme(app.theme, false);
     const savedScale = Number(savedUI.fontScale);
     app.fontScale = savedScale >= 1 && savedScale <= 1.5 ? savedScale : 1.15;
+    app.snap = savedUI.snap !== false;
     applyFontScale(app.fontScale, false);
+    if (els.snapToggle) els.snapToggle.checked = app.snap;
     if (savedUI.layers && typeof savedUI.layers === 'object') {
       Object.keys(app.layers).forEach(key => {
         if (typeof savedUI.layers[key] === 'boolean') app.layers[key] = savedUI.layers[key];
@@ -205,6 +223,11 @@
     ro.observe(els.stage3d);
     ro.observe(els.stageTree);
     window.addEventListener('resize', scheduleRender);
+    window.addEventListener('beforeunload', flushAutosave);
+    window.addEventListener('pagehide', flushAutosave);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') flushAutosave();
+    });
     requestAnimationFrame(() => {
       if (app.mode === '3d' && !app.fitted3d) fit3D();
       if (app.mode === 'tree' && !app.fittedTree) fitTree(true);
@@ -266,6 +289,7 @@
       persistUI();
     });
     els.addRegionBtn.addEventListener('click', addRegion);
+    els.jumpBtn.addEventListener('click', openJumpModal);
     els.showAllRegionsBtn.addEventListener('click', showAllRegions);
     els.regionList.addEventListener('click', e => {
       if (e.target.closest('[data-region-visible]')) { e.stopPropagation(); return; }
@@ -289,6 +313,11 @@
       syncViews();
       scheduleRender();
       persistUI();
+    });
+    els.snapToggle.addEventListener('change', () => {
+      app.snap = els.snapToggle.checked;
+      persistUI();
+      toast('网格吸附：' + (app.snap ? '开启（5px）' : '关闭'));
     });
     els.fontSizeControl.addEventListener('click', e => {
       const btn = e.target.closest('[data-font-scale]');
@@ -636,6 +665,8 @@
   }
 
   function renderRightPanel() {
+    const panelKey = app.rightTab + '|' + (app.selection ? app.selection.type + ':' + app.selection.id : 'none');
+    const scrollTop = els.rightBody.scrollTop;
     els.rightBody.classList.toggle('is-guide', app.rightTab === 'guide');
     document.querySelectorAll('.right-tabs button').forEach(btn => {
       btn.classList.toggle('is-active', btn.dataset.rtab === app.rightTab);
@@ -643,6 +674,8 @@
     if (app.rightTab === 'inspect') renderInspector();
     else if (app.rightTab === 'progress') renderProgress();
     else renderGuide();
+    els.rightBody.scrollTop = panelKey === app.lastPanelKey ? scrollTop : 0;
+    app.lastPanelKey = panelKey;
   }
 
   /* ============================================================
@@ -910,6 +943,8 @@
   /* ============================================================
      right panel events
      ============================================================ */
+  const NON_STRUCTURAL_FIELDS = new Set(['x', 'y', 'w', 'h', 'height', 'elev', 'depth', 'note', 'notes', 'title', 'color', 'tone']);
+
   function onRightInput(e) {
     const target = e.target;
     if (!target.matches('[data-field]')) return;
@@ -918,12 +953,20 @@
     beforeEdit();
     if (!applyField(field, target.value, target)) return;
     markDirty();
-    app.analysis = MV.analyze(app.project);
-    updateHeader();
-    updateStatus();
-    renderRegionList();
+    if (!NON_STRUCTURAL_FIELDS.has(field)) {
+      app.analysis = MV.analyze(app.project);
+      updateStatus();
+      renderRegionList();
+      if (app.rightTab === 'progress') renderProgress();
+    } else {
+      if (field === 'tone' || field === 'color') renderRegionList();
+      if (field === 'title') {
+        updateHeader();
+        const titleEl = els.rightBody.querySelector('.insp-title');
+        if (titleEl) titleEl.textContent = app.project.meta.title;
+      }
+    }
     scheduleRender();
-    if (app.rightTab === 'progress') renderProgress();
     persistUI();
   }
 
@@ -939,6 +982,12 @@
       return;
     }
     if (!target.matches('[data-field]')) return;
+    /* Text / number / color fields already commit on input; their change
+       event fires on blur and must not re-render the panel under the cursor. */
+    if (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT') {
+      const type = target.type;
+      if (type !== 'checkbox' && type !== 'radio') return;
+    }
     const field = target.dataset.field;
     beforeEdit();
     if (!applyField(field, target.type === 'checkbox' ? target.checked : target.value, target)) return;
@@ -1453,11 +1502,85 @@
     room.x = source.x + 28;
     room.y = source.y + 28;
     app.project.rooms.push(room);
+    const items = app.project.items.filter(item => item.room === source.id);
+    items.forEach(item => {
+      const copy = MV.clone(item);
+      copy.id = MV.uid('item');
+      copy.room = room.id;
+      app.project.items.push(copy);
+    });
     app.selection = { type: 'room', id: room.id };
+    app.rightTab = 'inspect';
+    app.currentRegion = room.region;
     app.analysis = MV.analyze(app.project);
     markDirty();
     refreshAll();
-    toast('房间已复制（不含物品与连接）');
+    toast('房间已复制' + (items.length ? '（含 ' + items.length + ' 个物品）' : '') + '（连接不复制）');
+  }
+
+  function copyRoomSelection() {
+    if (!app.selection || app.selection.type !== 'room') {
+      toast('请先选择一个房间再复制', true);
+      return;
+    }
+    const room = MV.findRoom(app.project, app.selection.id);
+    if (!room) return;
+    roomClipboard = {
+      room: MV.clone(room),
+      items: MV.clone(app.project.items.filter(item => item.room === room.id)),
+      pastes: 0
+    };
+    toast('已复制房间' + (roomClipboard.items.length ? '与 ' + roomClipboard.items.length + ' 个物品' : '') + '（Ctrl+V 粘贴）');
+  }
+
+  function pasteRoomClipboard() {
+    if (!roomClipboard) {
+      toast('剪贴板为空：先选中房间并按 Ctrl+C', true);
+      return;
+    }
+    const source = roomClipboard.room;
+    const regionId = app.project.regions.some(region => region.id === source.region)
+      ? source.region
+      : (app.project.regions.find(region => region.id === app.currentRegion) || app.project.regions[0]).id;
+    snapshot();
+    const offset = 30 * (++roomClipboard.pastes);
+    const room = MV.clone(source);
+    room.id = MV.uid('room');
+    room.name = source.name + ' 副本';
+    room.region = regionId;
+    room.x = source.x + offset;
+    room.y = source.y + offset;
+    app.project.rooms.push(room);
+    roomClipboard.items.forEach(item => {
+      const copy = MV.clone(item);
+      copy.id = MV.uid('item');
+      copy.room = room.id;
+      app.project.items.push(copy);
+    });
+    app.selection = { type: 'room', id: room.id };
+    app.rightTab = 'inspect';
+    app.currentRegion = regionId;
+    app.analysis = MV.analyze(app.project);
+    markDirty();
+    refreshAll();
+    toast('已粘贴房间' + (roomClipboard.items.length ? '与 ' + roomClipboard.items.length + ' 个物品' : '') + '（连接不复制）');
+  }
+
+  function nudgeSelection(dx, dy) {
+    if (!app.selection || app.selection.type !== 'room' || app.mode === 'tree') return;
+    const room = MV.findRoom(app.project, app.selection.id);
+    if (!room) return;
+    beforeEdit();
+    room.x += dx;
+    room.y += dy;
+    const xInput = els.rightBody.querySelector('[data-field="x"]');
+    const yInput = els.rightBody.querySelector('[data-field="y"]');
+    if (xInput) xInput.value = room.x;
+    if (yInput) yInput.value = room.y;
+    hideTooltip();
+    markDirty();
+    scheduleRender();
+    persistUI();
   }
 
   function addRegion() {
@@ -1473,6 +1596,7 @@
     app.project.regions.push(region);
     app.currentRegion = region.id;
     app.selection = { type: 'region', id: region.id };
+    app.rightTab = 'inspect';
     app.analysis = MV.analyze(app.project);
     markDirty();
     refreshAll();
@@ -1635,6 +1759,7 @@
     };
     app.project.items.push(item);
     app.selection = { type: 'item', id: item.id };
+    app.rightTab = 'inspect';
     app.tool = 'select';
     app.analysis = MV.analyze(app.project);
     markDirty();
@@ -1982,6 +2107,7 @@
   }
 
   function snap(value, step) {
+    if (!app.snap) return value;
     const s = step || 5;
     return Math.round(value / s) * s;
   }
@@ -2279,6 +2405,7 @@
       };
       app.project.rooms.push(room);
       app.selection = { type: 'room', id: room.id };
+      app.rightTab = 'inspect';
       app.tool = 'select';
       app.analysis = MV.analyze(app.project);
       markDirty();
@@ -2329,6 +2456,7 @@
       app.connectFrom = null;
       app.tool = 'select';
       app.selection = { type: 'link', id: exists.id };
+      app.rightTab = 'inspect';
       updateToolUI();
       refreshAll();
       toast('这两个房间之间已有连接');
@@ -2349,6 +2477,7 @@
     app.connectFrom = null;
     app.tool = 'select';
     app.selection = { type: 'link', id: link.id };
+    app.rightTab = 'inspect';
     app.analysis = MV.analyze(app.project);
     markDirty();
     updateToolUI();
@@ -2501,6 +2630,7 @@
 
   function replaceProject(project) {
     backupCurrent();
+    roomClipboard = null;
     app.project = MV.normalizeProject(project);
     app.history.clear();
     app.selection = null;
@@ -2674,6 +2804,119 @@
     });
   }
 
+  function openJumpModal() {
+    openModal(`<div class="modal jump-modal">
+      <div class="modal-head">
+        <div>
+          <div class="modal-kicker">JUMP / 快速定位</div>
+          <h2>跳到房间</h2>
+          <p>按房间名、区域、房间类型或备注搜索。</p>
+        </div>
+        <button class="modal-close" data-close aria-label="关闭">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="jump-search">
+          <input id="jumpInput" class="jump-input" placeholder="输入房间名 / 区域代码 / 类型 / 备注…" autocomplete="off" spellcheck="false">
+          <span class="jump-count" id="jumpCount"></span>
+        </div>
+        <div class="jump-list" id="jumpList"></div>
+        <p class="hint-line">↑↓ 选择 · Enter 定位 · Esc 关闭</p>
+      </div>
+      <div class="modal-foot"><button class="btn btn-ghost" data-close>关闭</button></div>
+    </div>`, {
+      onMount(overlay) {
+        const input = overlay.querySelector('#jumpInput');
+        const list = overlay.querySelector('#jumpList');
+        const count = overlay.querySelector('#jumpCount');
+        let results = [];
+        let active = 0;
+
+        function collect(query) {
+          const q = query.trim().toLowerCase();
+          const regionMap = {};
+          app.project.regions.forEach(region => { regionMap[region.id] = region; });
+          const itemCounts = {};
+          app.project.items.forEach(item => { itemCounts[item.room] = (itemCounts[item.room] || 0) + 1; });
+          return app.project.rooms.map((room, index) => {
+            const region = regionMap[room.region] || null;
+            const type = MV.roomTypeById(room.type);
+            const hay = [
+              room.name, room.note, type.name, type.code,
+              region ? region.name : '', region ? region.code : ''
+            ].join(' ').toLowerCase();
+            let score = 3;
+            if (!q) score = 0;
+            else if (room.name.toLowerCase().startsWith(q)) score = 0;
+            else if (room.name.toLowerCase().includes(q)) score = 1;
+            else if (hay.includes(q)) score = 2;
+            else return null;
+            return { room, region, type, itemCount: itemCounts[room.id] || 0, score, index };
+          }).filter(Boolean)
+            .sort((a, b) => a.score - b.score || a.index - b.index)
+            .slice(0, 80);
+        }
+
+        function paint() {
+          results = collect(input.value);
+          active = MV.clamp(active, 0, Math.max(0, results.length - 1));
+          count.textContent = results.length + ' / ' + app.project.rooms.length;
+          if (!results.length) {
+            list.innerHTML = '<div class="jump-empty">没有匹配的房间</div>';
+            return;
+          }
+          list.innerHTML = results.map((entry, index) => {
+            const phase = app.analysis.roomPhase[entry.room.id];
+            return `<button class="jump-row ${index === active ? 'is-active' : ''}" data-jump-index="${index}">
+              <span class="jr-name">${esc(entry.room.name)}</span>
+              <span class="jr-meta">${esc(entry.region ? entry.region.code : '--')} / ${esc(entry.type.code)}</span>
+              <span class="jr-meta">${entry.itemCount ? entry.itemCount + ' ITEMS' : ''}${phase != null ? ' · P' + String(phase).padStart(2, '0') : ''}</span>
+            </button>`;
+          }).join('');
+          const activeRow = list.querySelector('.is-active');
+          if (activeRow) activeRow.scrollIntoView({ block: 'nearest' });
+        }
+
+        function choose(index) {
+          const entry = results[index];
+          if (!entry) return;
+          if (app.hiddenRegions.has(entry.room.region)) {
+            app.hiddenRegions.delete(entry.room.region);
+            updateStatus();
+          }
+          closeModal();
+          select('room', entry.room.id);
+          if (app.mode !== '2d') switchMode('2d');
+          requestAnimationFrame(() => focusRoom(entry.room.id));
+        }
+
+        input.addEventListener('input', () => {
+          active = 0;
+          paint();
+        });
+        input.addEventListener('keydown', e => {
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            active = Math.min(results.length - 1, active + 1);
+            paint();
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            active = Math.max(0, active - 1);
+            paint();
+          } else if (e.key === 'Enter') {
+            e.preventDefault();
+            choose(active);
+          }
+        });
+        list.addEventListener('click', e => {
+          const row = e.target.closest('[data-jump-index]');
+          if (row) choose(Number(row.dataset.jumpIndex));
+        });
+        paint();
+        setTimeout(() => input.focus(), 30);
+      }
+    });
+  }
+
   function openPresetModal() {
     const activeId = app.project.meta.preset || 'mp1';
     let selected = activeId;
@@ -2736,9 +2979,12 @@
   function openHelpModal() {
     const rows = [
       ['V / R / C / I / H', '选择 / 房间 / 连接 / 物品 / 平移'],
-      ['1 / 2', '2D 路线 / 3D 地图'],
-      ['3', '能力锁树'],
+      ['1 / 2 / 3', '2D 路线 / 3D 地图 / 能力锁树'],
       ['F', '聚焦当前选择（锁树中按 F 切到 2D 定位）'],
+      ['/ 或 Ctrl / Cmd + K', '快速定位房间'],
+      ['方向键 / Shift + 方向键', '移动选中房间 5 / 1 单位'],
+      ['Ctrl / Cmd + C / V', '复制 / 粘贴房间（含物品，不含连接）'],
+      ['D 或 Ctrl / Cmd + D', '原地复制房间'],
       ['拖动房间', '移动位置'],
       ['拖动角点', '缩放房间'],
       ['空格 + 拖动 / 中键', '平移画布'],
@@ -2746,12 +2992,11 @@
       ['右键拖动（3D）', '旋转相机'],
       ['中键拖动（3D）', '平移相机'],
       ['Shift + 拖动（3D）', '调整房间基座高度'],
-      ['F', '聚焦当前选择'],
       ['Delete', '删除当前选择'],
       ['Ctrl / Cmd + Z', '撤销'],
       ['Ctrl / Cmd + Shift + Z', '重做'],
       ['Ctrl / Cmd + S', '保存到浏览器'],
-      ['Esc', '取消连接 / 关闭弹窗']
+      ['Esc', '退出输入 / 取消连接 / 关闭弹窗']
     ];
     openModal(`<div class="modal">
       <div class="modal-head">
@@ -2768,6 +3013,8 @@
         <p class="about-copy">顶栏的太阳 / 月亮按钮切换白天与黑夜主题；调色盘按钮打开配色面板，可在彩色与单色之间切换，逐段编辑阶段色带，并为每个区域单独指定颜色。彩色模式下，房间顶边表示区域、底边表示阶段，门锁与道具使用各自的语义色。</p>
         <div class="section-label">区域过滤</div>
         <p class="about-copy">左侧区域列表的复选框控制 2D / 3D 显示，可同时隐藏多个区域；区域检查器里有“仅显示此区域”，区域标题右侧的“全部”恢复所有区域。过滤只影响地图显示，不改变进度分析与路线判定。</p>
+        <div class="section-label">快速迭代</div>
+        <p class="about-copy">按 <span class="mono">/</span> 或 <span class="mono">Ctrl/Cmd + K</span> 打开快速定位，可按房间名、区域、类型或备注搜索。选中房间后，方向键按 5 单位移动，<span class="mono">Shift + 方向键</span> 按 1 单位微调；<span class="mono">Ctrl/Cmd + C / V</span> 复制粘贴房间及其物品，<span class="mono">Ctrl/Cmd + D</span> 原地复制。图层区的“网格吸附 5px”可关闭，获得自由坐标。</p>
         <div class="section-label">能力锁树</div>
         <p class="about-copy">顶栏第三个模式是能力锁树：它按获得步骤从上到下排列，每一行是一个阶段，上方卡片是本步获得的能力、钥匙、Boss 或可选强化，下方带颜色的卡片是本步解锁的门锁。每张门锁卡直接标出“← 需要什么 / → 通向哪里”。单击卡片在右侧检查器查看对应物品或连接；双击或按 F 切到 2D 定位。</p>
         <div class="section-label">数据</div>
@@ -2869,7 +3116,45 @@
       saveNow();
       return;
     }
+    if (mod && key.toLowerCase() === 'k') {
+      e.preventDefault();
+      openJumpModal();
+      return;
+    }
+    if (e.key === 'Escape' && isTyping()) {
+      document.activeElement.blur();
+      return;
+    }
     if (isTyping()) return;
+
+    if (mod && key.toLowerCase() === 'c') {
+      if (app.selection && app.selection.type === 'room') {
+        e.preventDefault();
+        copyRoomSelection();
+      }
+      return;
+    }
+    if (mod && key.toLowerCase() === 'v') {
+      if (roomClipboard) {
+        e.preventDefault();
+        pasteRoomClipboard();
+      }
+      return;
+    }
+    if (mod && key.toLowerCase() === 'd') {
+      if (app.selection && app.selection.type === 'room') {
+        e.preventDefault();
+        duplicateRoom();
+      }
+      return;
+    }
+    if (!mod && key.toLowerCase() === 'd') {
+      if (app.selection && app.selection.type === 'room') {
+        e.preventDefault();
+        duplicateRoom();
+      }
+      return;
+    }
 
     if (mod && key.toLowerCase() === 'z') {
       e.preventDefault();
@@ -2879,6 +3164,19 @@
     if (mod && key.toLowerCase() === 'y') {
       e.preventDefault();
       redo();
+      return;
+    }
+
+    if (key.indexOf('Arrow') === 0) {
+      if (app.selection && app.selection.type === 'room' && app.mode !== 'tree') {
+        const step = e.shiftKey ? 1 : 5;
+        const dx = key === 'ArrowLeft' ? -step : key === 'ArrowRight' ? step : 0;
+        const dy = key === 'ArrowUp' ? -step : key === 'ArrowDown' ? step : 0;
+        if (dx || dy) {
+          e.preventDefault();
+          nudgeSelection(dx, dy);
+        }
+      }
       return;
     }
 
@@ -2915,6 +3213,7 @@
     if (key.toLowerCase() === 'i') { setTool('item'); return; }
     if (key.toLowerCase() === 'h') { setTool('pan'); return; }
     if (key.toLowerCase() === 'f') { focusSelection(); return; }
+    if (key === '/' && !e.shiftKey) { e.preventDefault(); openJumpModal(); return; }
     if (key === '?' || (key === '/' && e.shiftKey)) { openHelpModal(); return; }
   }
 

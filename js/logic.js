@@ -31,11 +31,12 @@
       return { rooms, parent };
     }
     const queue = [project.startRoom];
+    let head = 0;
     rooms.add(project.startRoom);
     parent[project.startRoom] = null;
 
-    while (queue.length) {
-      const current = queue.shift();
+    while (head < queue.length) {
+      const current = queue[head++];
       const edges = adjacency[current] || [];
       for (let i = 0; i < edges.length; i++) {
         const edge = edges[i];

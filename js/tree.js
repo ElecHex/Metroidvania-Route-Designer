@@ -10,6 +10,7 @@
   const FONT_MONO = '"Cascadia Mono", "Consolas", "Microsoft YaHei", monospace';
 
   let lastLayout = { width: 0, height: 0, cam: null, nodes: [], gateChips: [], graph: null };
+  let treeCache = { project: null, analysis: null, regionKey: '', graph: null };
 
   function makeNode(id, type, opts) {
     return Object.assign({
@@ -21,6 +22,10 @@
   function buildLockTree(project, analysis) {
     if (!project || !analysis) {
       return { nodes: [], gateChips: [], steps: [], bounds: { minX: 0, minY: 0, maxX: 800, maxY: 400 }, meta: { items: 0, gates: 0, steps: 0, optional: 0, keys: 0, unreachableItems: 0 } };
+    }
+    const regionKey = (project.regions || []).map(region => region.color).join('|');
+    if (treeCache.graph && treeCache.project === project && treeCache.analysis === analysis && treeCache.regionKey === regionKey) {
+      return treeCache.graph;
     }
     const roomMap = {};
     const regionMap = {};
@@ -200,7 +205,7 @@
     if (keypool) nodes.push(keypool);
     nodes.push(...itemNodes);
 
-    return {
+    const graph = {
       nodes,
       gateChips: gateChipsAll,
       steps: usedSteps,
@@ -218,6 +223,8 @@
         cycles: 0
       }
     };
+    treeCache = { project, analysis, regionKey, graph };
+    return graph;
   }
 
   function worldToScreen(wx, wy, cam, W, H) {

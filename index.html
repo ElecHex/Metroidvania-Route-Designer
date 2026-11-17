@@ -119,6 +119,9 @@
         <div class="panel-heading">
           <span>区域 <span id="regionSummary" class="heading-hint"></span></span>
           <div class="heading-actions">
+            <button id="jumpBtn" class="mini-btn" title="快速定位房间 (/)" aria-label="快速定位房间">
+              <svg viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.4"/><path d="m10.4 10.4 3 3"/></svg>
+            </button>
             <button id="showAllRegionsBtn" class="mini-text-btn" title="显示全部区域">全部</button>
             <button id="addRegionBtn" class="mini-btn" title="新增区域">+</button>
           </div>
@@ -137,6 +140,10 @@
           <label><input type="checkbox" data-layer="grid" checked><span>网格</span></label>
           <label><input type="checkbox" data-layer="names" checked><span>房间名称</span></label>
         </div>
+        <label class="snap-line" title="拖动、缩放房间时按 5px 网格吸附">
+          <input type="checkbox" id="snapToggle" checked>
+          <span>网格吸附 5px</span>
+        </label>
         <div class="font-size-block">
           <div class="panel-heading font-size-heading"><span>字体大小</span><span class="heading-hint">Aa</span></div>
           <div class="segmented" id="fontSizeControl">
