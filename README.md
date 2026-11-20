@@ -1,5 +1,7 @@
 # Metroidvania Route Designer
 
+**中文** | [English](README.en.md)
+
 面向 3D 银河城（Metroidvania）的关卡路线设计工具。把「2D 路线图」「3D 房间体块」「能力锁树」放在同一个浏览器项目里，用于前期结构设计、锁链验证和空间推演。
 
 项目代号 **ROUTE FORGE**。纯前端、零依赖，直接打开 `index.html` 即可运行。
@@ -119,6 +121,15 @@
 - 缩放同时作用于界面文字与 2D / 3D / 能力锁树的 Canvas 标签
 - 档位随 UI 状态保存到 localStorage，刷新后保持
 
+### 8. 中英文界面
+
+- “图层”标题右侧的 **EN / 中文** 按钮一键切换界面语言
+- 覆盖静态界面、检查器、进度、设计指南、帮助、配色、预设、快速定位与锁树 Canvas 标签
+- 语言随 UI 状态保存到 localStorage，刷新后保持
+- 预设中的房间名、道具名等属于**项目数据**，保持预设原本的语言
+
+![英文界面](docs/screenshots/english-ui.jpg)
+
 ## 快速开始
 
 无需安装、无需构建：
@@ -209,6 +220,7 @@ python -m http.server 8000
 .
 ├── index.html              # 应用外壳、模式、面板、Canvas
 ├── css/app.css             # 黑白灰界面、白天/黑夜、响应式
+├── js/i18n.js              # 中英文界面语言与静态文案切换
 ├── js/core.js              # 数据模型、主题 token、颜色工具、存储、历史
 ├── js/presets.js           # 密特罗德 Prime / 超级密特罗德 / 空洞骑士 / 空白
 ├── js/logic.js             # 可达性分析、锁死检测、时间轴、门锁链

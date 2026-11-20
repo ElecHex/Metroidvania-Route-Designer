@@ -4,6 +4,7 @@
 (function (global) {
   'use strict';
   const MV = global.MV = global.MV || {};
+  const L = MV.L;
 
   function canPass(link, abilities, keys) {
     const requires = Array.isArray(link.requires) ? link.requires : [];
@@ -230,12 +231,12 @@
     }
 
     if (!roomMap[project.startRoom]) {
-      addWarning('error', 'no-start', '起点缺失', '项目没有有效的起点房间，分析无法开始。');
+      addWarning('error', 'no-start', L('起点缺失', 'Missing Start'), L('项目没有有效的起点房间，分析无法开始。', 'The project has no valid start room, so analysis cannot begin.'));
     }
     if (!roomMap[project.goalRoom]) {
-      addWarning('error', 'no-goal', '终点缺失', '项目没有有效的终点房间。');
+      addWarning('error', 'no-goal', L('终点缺失', 'Missing Goal'), L('项目没有有效的终点房间。', 'The project has no valid goal room.'));
     } else if (!goalReached) {
-      addWarning('error', 'goal-locked', '终点未闭合', '从起点无法到达终点。请检查门锁链、缺失能力或单向连接。');
+      addWarning('error', 'goal-locked', L('终点未闭合', 'Goal Not Closed'), L('从起点无法到达终点。请检查门锁链、缺失能力或单向连接。', 'The goal cannot be reached from the start. Check the gate chain, missing abilities or one-way links.'));
     }
 
     const grantedBy = {};
@@ -257,17 +258,21 @@
         const reachableGrants = grants.filter(item => finalReachable.has(item.room));
         if (!defined) {
           addWarning('error', 'undefined-ability-' + req,
-            '未定义能力',
-            gate.name + '（' + label + '）需要能力 “' + req + '”，但项目能力表中不存在它。');
+            L('未定义能力', 'Undefined Ability'),
+            L(gate.name + '（' + label + '）需要能力 “' + req + '”，但项目能力表中不存在它。',
+              gate.name + ' (' + label + ') requires ability “' + req + '”, but it is not defined in the project ability list.'));
         } else if (!grants.length) {
           addWarning('error', 'no-source-' + req,
-            '能力没有来源',
-            gate.name + '（' + label + '）需要「' + MV.abilityName(project, req) + '」，但没有任何道具授予它。');
+            L('能力没有来源', 'Ability Has No Source'),
+            L(gate.name + '（' + label + '）需要「' + MV.abilityName(project, req) + '」，但没有任何道具授予它。',
+              gate.name + ' (' + label + ') requires “' + MV.abilityName(project, req) + '”, but no item grants it.'));
         } else if (!reachableGrants.length) {
           addWarning('warn', 'unreachable-source-' + req,
-            '潜在锁死',
-            gate.name + '（' + label + '）需要「' + MV.abilityName(project, req) + '」，但授予它的道具全部位于不可达房间：' +
-            grants.slice(0, 3).map(item => (roomMap[item.room] || {}).name || item.room).join('、') + '。');
+            L('潜在锁死', 'Potential Deadlock'),
+            L(gate.name + '（' + label + '）需要「' + MV.abilityName(project, req) + '」，但授予它的道具全部位于不可达房间：' +
+              grants.slice(0, 3).map(item => (roomMap[item.room] || {}).name || item.room).join('、') + '。',
+              gate.name + ' (' + label + ') requires “' + MV.abilityName(project, req) + '”, but every item that grants it is in an unreachable room: ' +
+              grants.slice(0, 3).map(item => (roomMap[item.room] || {}).name || item.room).join(', ') + '.'));
         }
       });
 
@@ -275,12 +280,14 @@
         const deficit = (Number(link.keyReq) || 0) - keys;
         if (keysTotal < (Number(link.keyReq) || 0)) {
           addWarning('error', 'key-total-' + link.id,
-            '钥匙预算不足',
-            gate.name + '（' + label + '）要求 ' + link.keyReq + ' 把钥匙，但整个项目只有 ' + keysTotal + ' 把。');
+            L('钥匙预算不足', 'Insufficient Key Budget'),
+            L(gate.name + '（' + label + '）要求 ' + link.keyReq + ' 把钥匙，但整个项目只有 ' + keysTotal + ' 把。',
+              gate.name + ' (' + label + ') requires ' + link.keyReq + ' keys, but the whole project contains only ' + keysTotal + '.'));
         } else {
           addWarning('warn', 'key-deficit-' + link.id,
-            '钥匙尚未集齐',
-            gate.name + '（' + label + '）还差 ' + deficit + ' 把钥匙，当前已收集 ' + keys + ' / ' + keysTotal + '。');
+            L('钥匙尚未集齐', 'Keys Not Yet Collected'),
+            L(gate.name + '（' + label + '）还差 ' + deficit + ' 把钥匙，当前已收集 ' + keys + ' / ' + keysTotal + '。',
+              gate.name + ' (' + label + ') still needs ' + deficit + ' keys; currently collected ' + keys + ' / ' + keysTotal + '.'));
         }
       }
     });
@@ -290,18 +297,21 @@
       addWarning(
         withItems.length ? 'warn' : 'info',
         'unreachable-rooms',
-        withItems.length ? '不可达房间包含道具' : '存在不可达房间',
-        unreachableRooms.length + ' 个房间不可达' +
-        (withItems.length ? '，其中包含 ' + withItems.length + ' 个道具：' +
-          withItems.slice(0, 4).map(item => item.name).join('、') + (withItems.length > 4 ? ' 等' : '') : '') + '。'
+        withItems.length ? L('不可达房间包含道具', 'Unreachable Rooms Contain Items') : L('存在不可达房间', 'Unreachable Rooms'),
+        L(unreachableRooms.length + ' 个房间不可达' +
+          (withItems.length ? '，其中包含 ' + withItems.length + ' 个道具：' +
+            withItems.slice(0, 4).map(item => item.name).join('、') + (withItems.length > 4 ? ' 等' : '') : '') + '。',
+          unreachableRooms.length + ' unreachable rooms' +
+          (withItems.length ? ', containing ' + withItems.length + ' items: ' +
+            withItems.slice(0, 4).map(item => item.name).join(', ') + (withItems.length > 4 ? ', ...' : '') : '') + '.')
       );
     }
 
     if (!rooms.some(room => room.type === 'boss')) {
-      addWarning('info', 'no-boss', '没有 Boss 房', '当前路线没有 Boss 类型房间。若这是有意设计可忽略。');
+      addWarning('info', 'no-boss', L('没有 Boss 房', 'No Boss Room'), L('当前路线没有 Boss 类型房间。若这是有意设计可忽略。', 'The route has no boss-type room. Ignore this if intentional.'));
     }
     if (!rooms.some(room => room.type === 'save')) {
-      addWarning('info', 'no-save', '没有存档点', '建议在长路线或 Boss 前放置存档 / 安全屋。');
+      addWarning('info', 'no-save', L('没有存档点', 'No Save Point'), L('建议在长路线或 Boss 前放置存档 / 安全屋。', 'Consider placing a save / safe room before long routes or bosses.'));
     }
 
     const timelineGroups = {};

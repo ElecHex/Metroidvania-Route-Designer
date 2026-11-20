@@ -5,12 +5,13 @@
 (function (global) {
   'use strict';
   const MV = global.MV = global.MV || {};
+  const L = MV.L;
 
   const FONT_UI = '"Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei", sans-serif';
   const FONT_MONO = '"Cascadia Mono", "Consolas", "Microsoft YaHei", monospace';
 
   let lastLayout = { width: 0, height: 0, cam: null, nodes: [], gateChips: [], graph: null };
-  let treeCache = { project: null, analysis: null, regionKey: '', graph: null };
+  let treeCache = { project: null, analysis: null, regionKey: '', lang: '', graph: null };
 
   function makeNode(id, type, opts) {
     return Object.assign({
@@ -24,7 +25,7 @@
       return { nodes: [], gateChips: [], steps: [], bounds: { minX: 0, minY: 0, maxX: 800, maxY: 400 }, meta: { items: 0, gates: 0, steps: 0, optional: 0, keys: 0, unreachableItems: 0 } };
     }
     const regionKey = (project.regions || []).map(region => region.color).join('|');
-    if (treeCache.graph && treeCache.project === project && treeCache.analysis === analysis && treeCache.regionKey === regionKey) {
+    if (treeCache.graph && treeCache.project === project && treeCache.analysis === analysis && treeCache.regionKey === regionKey && treeCache.lang === MV.getLang()) {
       return treeCache.graph;
     }
     const roomMap = {};
@@ -97,8 +98,8 @@
         return room ? room.region : null;
       }).filter(Boolean));
       keypool = makeNode('keypool', 'keypool', {
-        label: '钥匙 / 神器 ×' + unpickedKeys.length,
-        sub: keyRegions.size + ' 个区域 · 全局钥匙预算',
+        label: L('钥匙 / 神器 ×', 'Keys / Artifacts ×') + unpickedKeys.length,
+        sub: L(keyRegions.size + ' 个区域 · 全局钥匙预算', keyRegions.size + ' regions · global key budget'),
         icon: 'KY',
         color: '#ffd54f',
         w: 200, h: 48, step: 0
@@ -131,7 +132,7 @@
         const requirements = (link.requires || [])
           .filter(req => !startAbilities.has(req))
           .map(req => MV.abilityName(project, req));
-        if (Number(link.keyReq) > 0) requirements.push('钥匙 ×' + link.keyReq);
+        if (Number(link.keyReq) > 0) requirements.push(L('钥匙 ×', 'Keys ×') + link.keyReq);
         usedGates.add(linkId);
         gates.push({
           type: 'gate',
@@ -223,7 +224,7 @@
         cycles: 0
       }
     };
-    treeCache = { project, analysis, regionKey, graph };
+    treeCache = { project, analysis, regionKey, lang: MV.getLang(), graph };
     return graph;
   }
 
@@ -304,7 +305,7 @@
     ctx.fillText('STEP ' + String(step.index).padStart(2, '0'), p.x + 19, headerY);
     ctx.font = '9px ' + FONT_UI;
     ctx.fillStyle = theme.ink;
-    const title = step.index === 0 ? '起始 / 初始收集' : (step.index === (view.analysis.stepCount || 1) - 1 ? '终局' : '推进');
+    const title = step.index === 0 ? L('起始 / 初始收集', 'START / INITIAL') : (step.index === (view.analysis.stepCount || 1) - 1 ? L('终局', 'ENDGAME') : L('推进', 'PROGRESS'));
     ctx.fillText(title, p.x + 79, headerY);
     if (r.h >= 20) {
       ctx.font = '7px ' + FONT_MONO;
@@ -425,7 +426,7 @@
       ctx.fillStyle = theme.ink;
       ctx.fillText(truncate(ctx, chip.name, Math.max(20, maxText)), textX, r.top + 12);
       if (r.h >= 20) {
-        const requireText = chip.requires.length ? '← ' + chip.requires.join(' + ') : '← 无门槛';
+        const requireText = chip.requires.length ? '← ' + chip.requires.join(' + ') : L('← 无门槛', '← No requirement');
         ctx.font = '6.5px ' + FONT_MONO;
         ctx.fillStyle = theme.inkDim;
         const subY = r.h >= 30 ? r.top + 24 : r.top + r.h - 4;

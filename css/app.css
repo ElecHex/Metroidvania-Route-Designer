@@ -206,6 +206,8 @@ a:hover { color: var(--white); border-color: var(--line-3); }
   border-right: 1px solid var(--line);
   background: var(--panel);
   min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   display: flex; flex-direction: column;
   position: relative; z-index: 5;
 }
@@ -780,6 +782,7 @@ html[data-theme="light"] .region-color-row input[type="color"] { border-color: r
   .brand { width: calc(var(--left-w) - 26px); }
   .brand-sub { display: none; }
   .save-state { display: none; }
+  html[lang="en"] .panel-heading { letter-spacing: .1em; }
 }
 @media (max-width: 1180px) {
   .project-ident { display: none; }
@@ -797,9 +800,15 @@ html[data-theme="light"] .region-color-row input[type="color"] { border-color: r
   :root { --left-w: 184px; --right-w: 280px; }
   .brand { width: auto; }
   .brand-mark { display: none; }
+  html[lang="en"] .brand { display: none; }
   #jumpBtn { display: none; }
   .brand-title { font-size: calc(12px * var(--font-scale)); letter-spacing: .16em; }
   .top-actions .divider { display: none; }
+  .panel-heading { gap: 6px; }
+  .panel-heading > span { white-space: nowrap; }
+  .heading-actions { gap: 4px; }
+  #itemKindSeg { grid-template-columns: repeat(2, 1fr); }
+  .micro-copy { display: none; }
   .layer-list { grid-template-columns: 1fr; }
   .tool-btn { grid-template-columns: 18px 1fr auto; gap: 7px; padding-left: 7px; }
   .region-list { padding-right: 0; }

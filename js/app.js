@@ -4,6 +4,7 @@
 (function (global) {
   'use strict';
   const MV = global.MV;
+  const L = MV.L;
   const $ = id => document.getElementById(id);
 
   const els = {
@@ -27,6 +28,7 @@
     regionList: $('regionList'),
     layerList: $('layerList'),
     snapToggle: $('snapToggle'),
+    langBtn: $('langBtn'),
     fontSizeControl: $('fontSizeControl'),
     exportPngBtn: $('exportPngBtn'),
     stage2d: $('stage2d'),
@@ -59,6 +61,7 @@
     mode: '2d',
     theme: 'dark',
     colorMode: 'color',
+    lang: 'zh',
     fontScale: 1.15,
     hiddenRegions: new Set(),
     itemKind: 'ability',
@@ -105,6 +108,7 @@
       rightTab: app.rightTab,
       fontScale: app.fontScale,
       snap: app.snap,
+      lang: app.lang,
       layers: app.layers,
       hiddenRegions: Array.from(app.hiddenRegions),
       currentRegion: app.currentRegion,
@@ -137,6 +141,9 @@
      ============================================================ */
   function boot() {
     const savedUI = MV.loadUI() || {};
+    app.lang = savedUI.lang === 'en' ? 'en' : 'zh';
+    MV.setLang(app.lang);
+    MV.applyI18n();
     app.theme = savedUI.theme === 'light' ? 'light' : 'dark';
     applyTheme(app.theme, false);
     const savedScale = Number(savedUI.fontScale);
@@ -244,14 +251,14 @@
   function bindUI() {
     els.projectName.addEventListener('input', () => {
       beforeEdit();
-      app.project.meta.title = els.projectName.value || '未命名路线';
+      app.project.meta.title = els.projectName.value || L('未命名路线', 'Untitled Route');
       markDirty();
       scheduleRender();
       persistUI();
     });
     els.projectName.addEventListener('blur', () => {
       if (!els.projectName.value.trim()) {
-        els.projectName.value = '未命名路线';
+        els.projectName.value = L('未命名路线', 'Untitled Route');
         app.project.meta.title = els.projectName.value;
         markDirty();
       }
@@ -317,7 +324,10 @@
     els.snapToggle.addEventListener('change', () => {
       app.snap = els.snapToggle.checked;
       persistUI();
-      toast('网格吸附：' + (app.snap ? '开启（5px）' : '关闭'));
+      toast(L('网格吸附：', 'Snap grid: ') + (app.snap ? L('开启（5px）', 'on (5px)') : L('关闭', 'off')));
+    });
+    els.langBtn.addEventListener('click', () => {
+      applyLanguage(app.lang === 'zh' ? 'en' : 'zh', true);
     });
     els.fontSizeControl.addEventListener('click', e => {
       const btn = e.target.closest('[data-font-scale]');
@@ -410,7 +420,7 @@
       app.selection = null;
       app.rightTab = 'inspect';
       renderRightPanel();
-      toast('全局钥匙池：' + node.sub);
+      toast(L('全局钥匙池：', 'Global key pool: ') + node.sub);
     }
   }
 
@@ -592,20 +602,20 @@
 
   function updateHeader() {
     if (document.activeElement !== els.projectName) {
-      els.projectName.value = app.project.meta.title || '未命名路线';
+      els.projectName.value = app.project.meta.title || L('未命名路线', 'Untitled Route');
     }
     updateSaveState();
   }
 
   function updateSaveState() {
     if (app.dirty) {
-      els.saveState.textContent = '编辑中 · 未保存';
+      els.saveState.textContent = L('编辑中 · 未保存', 'Editing · unsaved');
       els.saveState.classList.add('is-dirty');
     } else if (app.lastSaved) {
-      els.saveState.textContent = '已保存 ' + MV.formatTime(app.lastSaved);
+      els.saveState.textContent = L('已保存 ', 'Saved ') + MV.formatTime(app.lastSaved);
       els.saveState.classList.remove('is-dirty');
     } else {
-      els.saveState.textContent = '本地自动保存';
+      els.saveState.textContent = L('本地自动保存', 'Autosaved locally');
       els.saveState.classList.remove('is-dirty');
     }
   }
@@ -651,17 +661,17 @@
       const count = app.project.rooms.filter(room => room.region === region.id).length;
       const color = MV.regionColor(region, app.colorMode);
       const hidden = app.hiddenRegions.has(region.id);
-      return `<div class="region-row ${region.id === activeRegion ? 'is-active' : ''} ${hidden ? 'is-hidden' : ''}" data-region="${esc(region.id)}" role="button" tabindex="0" title="${esc(region.code)} / ${count} rooms">
-        <input class="region-visible" type="checkbox" data-region-visible="${esc(region.id)}" ${hidden ? '' : 'checked'} title="${hidden ? '显示' : '隐藏'} ${esc(region.name)}" aria-label="${hidden ? '显示' : '隐藏'} ${esc(region.name)}">
+      return `<div class="region-row ${region.id === activeRegion ? 'is-active' : ''} ${hidden ? 'is-hidden' : ''}" data-region="${esc(region.id)}" role="button" tabindex="0" title="${esc(region.code)} / ${count} ${L('房间', 'rooms')}">
+        <input class="region-visible" type="checkbox" data-region-visible="${esc(region.id)}" ${hidden ? '' : 'checked'} title="${hidden ? L('显示', 'Show') : L('隐藏', 'Hide')} ${esc(region.name)}" aria-label="${hidden ? L('显示', 'Show') : L('隐藏', 'Hide')} ${esc(region.name)}">
         <span class="region-swatch" style="background:${color}"></span>
         <span class="region-name">${esc(region.name)}</span>
         <span class="region-count">${String(count).padStart(2, '0')}</span>
-        <button class="region-focus" data-focus-region="${esc(region.id)}" title="聚焦区域">
+        <button class="region-focus" data-focus-region="${esc(region.id)}" title="${L('聚焦区域', 'Focus region')}">
           <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="4.5"/><path d="M8 1v3M8 12v3M1 8h3M12 8h3"/></svg>
         </button>
       </div>`;
     }).join('');
-    els.regionList.innerHTML = html || '<div class="region-empty">还没有区域</div>';
+    els.regionList.innerHTML = html || '<div class="region-empty">' + L('还没有区域', 'No regions yet') + '</div>';
   }
 
   function renderRightPanel() {
@@ -718,43 +728,43 @@
       { text: items.length + ' ITEMS' },
       { text: reachable ? (phase !== undefined ? 'PHASE ' + String(phase).padStart(2, '0') : 'REACHABLE') : 'UNREACHABLE', solid: !reachable }
     ];
-    return `${inspectorHead('ROOM / 房间', room.name, pills)}
+    return `${inspectorHead(L('ROOM / 房间', 'ROOM'), room.name, pills)}
       <div class="form-grid">
-        <label class="field"><span>名称</span><input data-field="name" value="${esc(room.name)}"></label>
+        <label class="field"><span>${L('名称', 'Name')}</span><input data-field="name" value="${esc(room.name)}"></label>
         <div class="form-grid two">
-          <label class="field"><span>区域</span><select data-field="region">${app.project.regions.map(r => `<option value="${esc(r.id)}" ${r.id === room.region ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select></label>
-          <label class="field"><span>类型</span><select data-field="type">${MV.ROOM_TYPES.map(t => `<option value="${t.id}" ${t.id === room.type ? 'selected' : ''}>${t.name}</option>`).join('')}</select></label>
+          <label class="field"><span>${L('区域', 'Region')}</span><select data-field="region">${app.project.regions.map(r => `<option value="${esc(r.id)}" ${r.id === room.region ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select></label>
+          <label class="field"><span>${L('类型', 'Type')}</span><select data-field="type">${MV.ROOM_TYPES.map(t => `<option value="${t.id}" ${t.id === room.type ? 'selected' : ''}>${t.name}</option>`).join('')}</select></label>
         </div>
         <div class="form-grid two">
           ${numberField('X', 'x', room.x, 5)}
           ${numberField('Y', 'y', room.y, 5)}
         </div>
         <div class="form-grid two">
-          ${numberField('宽度', 'w', room.w, 5, 56)}
-          ${numberField('高度（2D）', 'h', room.h, 5, 36)}
+          ${numberField(L('宽度', 'Width'), 'w', room.w, 5, 56)}
+          ${numberField(L('高度（2D）', 'Height (2D)'), 'h', room.h, 5, 36)}
         </div>
-        <div class="section-label">3D 体块</div>
+        <div class="section-label">${L('3D 体块', '3D Massing')}</div>
         <div class="form-grid three">
-          ${numberField('层高', 'height', room.height, 2, 8)}
-          ${numberField('基座', 'elev', room.elev, 2)}
-          ${numberField('进深', 'depth', room.depth, 2, 10)}
+          ${numberField(L('层高', 'Height'), 'height', room.height, 2, 8)}
+          ${numberField(L('基座', 'Elev'), 'elev', room.elev, 2)}
+          ${numberField(L('进深', 'Depth'), 'depth', room.depth, 2, 10)}
         </div>
-        <p class="hint-line">2D 宽度 / 高度控制平面轮廓；层高、基座、进深只影响 3D 体块。可在 3D 视图中直接拖动，Shift+拖动改基座高度。</p>
-        <label class="field"><span>备注</span><textarea data-field="note" rows="3">${esc(room.note)}</textarea></label>
+        <p class="hint-line">${L('2D 宽度 / 高度控制平面轮廓；层高、基座、进深只影响 3D 体块。可在 3D 视图中直接拖动，Shift+拖动改基座高度。', '2D width / height define the plan outline; height, elevation and depth only affect the 3D massing. Drag directly in the 3D view, or Shift+drag to change elevation.')}</p>
+        <label class="field"><span>${L('备注', 'Note')}</span><textarea data-field="note" rows="3">${esc(room.note)}</textarea></label>
       </div>
-      <div class="section-label">房间物品</div>
+      <div class="section-label">${L('房间物品', 'Room Items')}</div>
       <div class="item-list">
-        ${items.length ? items.map(item => itemRow(item, true)).join('') : '<div class="item-empty">这间房还没有物品。</div>'}
+        ${items.length ? items.map(item => itemRow(item, true)).join('') : `<div class="item-empty">${L('这间房还没有物品。', 'No items in this room yet.')}</div>`}
       </div>
-      <div class="btn-row"><button class="btn btn-ghost" data-action="add-item" data-room="${esc(room.id)}">+ 添加物品</button></div>
-      <div class="section-label">连接</div>
+      <div class="btn-row"><button class="btn btn-ghost" data-action="add-item" data-room="${esc(room.id)}">+ ${L('添加物品', 'Add Item')}</button></div>
+      <div class="section-label">${L('连接', 'Links')}</div>
       <div class="item-list">
-        ${links.length ? links.map(link => linkRow(link, room.id)).join('') : '<div class="item-empty">这间房还没有连接。</div>'}
+        ${links.length ? links.map(link => linkRow(link, room.id)).join('') : `<div class="item-empty">${L('这间房还没有连接。', 'No links for this room yet.')}</div>`}
       </div>
       <div class="btn-row">
-        <button class="btn" data-action="focus">聚焦房间</button>
-        <button class="btn" data-action="duplicate-room">复制</button>
-        <button class="btn btn-danger" data-action="delete-room">删除房间</button>
+        <button class="btn" data-action="focus">${L('聚焦房间', 'Focus Room')}</button>
+        <button class="btn" data-action="duplicate-room">${L('复制', 'Duplicate')}</button>
+        <button class="btn btn-danger" data-action="delete-room">${L('删除房间', 'Delete Room')}</button>
       </div>`;
   }
 
@@ -788,36 +798,36 @@
     const missingAbilities = (link.requires || []).filter(req => !app.project.abilities.some(ability => ability.id === req));
     const pills = [
       { text: gate.code + ' / ' + gate.name },
-      { text: link.dir === 'both' ? '双向' : (link.dir === 'a2b' ? 'A → B' : 'B → A') },
+      { text: link.dir === 'both' ? L('双向', 'Two-way') : (link.dir === 'a2b' ? 'A → B' : 'B → A') },
       { text: open ? 'OPEN' : 'LOCKED', solid: true }
     ];
     const dirSymbol = link.dir === 'both' ? '↔' : (link.dir === 'a2b' ? '→' : '←');
-    return `${inspectorHead('LINK / 连接', (a ? a.name : '?') + ' ' + dirSymbol + ' ' + (b ? b.name : '?'), pills)}
+    return `${inspectorHead(L('LINK / 连接', 'LINK'), (a ? a.name : '?') + ' ' + dirSymbol + ' ' + (b ? b.name : '?'), pills)}
       <div class="form-grid">
-        <label class="field"><span>门锁类型</span><select data-field="gate">${MV.GATE_TYPES.map(g => `<option value="${g.id}" ${g.id === link.gate ? 'selected' : ''}>${g.code} · ${g.name}</option>`).join('')}</select></label>
+        <label class="field"><span>${L('门锁类型', 'Gate Type')}</span><select data-field="gate">${MV.GATE_TYPES.map(g => `<option value="${g.id}" ${g.id === link.gate ? 'selected' : ''}>${g.code} · ${g.name}</option>`).join('')}</select></label>
         <div class="field-row">
-          <label class="field" style="flex:1"><span>方向</span><select data-field="dir">
-            <option value="both" ${link.dir === 'both' ? 'selected' : ''}>双向通行</option>
-            <option value="a2b" ${link.dir === 'a2b' ? 'selected' : ''}>A → B 单向</option>
-            <option value="b2a" ${link.dir === 'b2a' ? 'selected' : ''}>B → A 单向</option>
+          <label class="field" style="flex:1"><span>${L('方向', 'Direction')}</span><select data-field="dir">
+            <option value="both" ${link.dir === 'both' ? 'selected' : ''}>${L('双向通行', 'Two-way')}</option>
+            <option value="a2b" ${link.dir === 'a2b' ? 'selected' : ''}>${L('A → B 单向', 'A → B one-way')}</option>
+            <option value="b2a" ${link.dir === 'b2a' ? 'selected' : ''}>${L('B → A 单向', 'B → A one-way')}</option>
           </select></label>
-          ${numberField('钥匙数', 'keyReq', link.keyReq, 1, 0)}
+          ${numberField(L('钥匙数', 'Keys'), 'keyReq', link.keyReq, 1, 0)}
         </div>
-        <p class="hint-line">${esc(gate.desc)} 修改门锁类型会重置下方能力需求；之后可继续自定义勾选。</p>
-        <div class="section-label">能力需求</div>
-        ${app.project.abilities.length ? `<div class="check-grid">${app.project.abilities.map(ability => `<label class="check-field"><input type="checkbox" data-field="requires" data-ability="${esc(ability.id)}" ${link.requires.includes(ability.id) ? 'checked' : ''}><span>${esc(ability.name)}</span></label>`).join('')}</div>` : '<p class="hint-line">项目能力表为空，请先在项目检查器中添加能力。</p>'}
-        ${missingAbilities.length ? `<div class="req-list">${missingAbilities.map(id => `<span class="req-chip missing">缺失: ${esc(id)}</span>`).join('')}</div>` : ''}
-        <div class="section-label">状态</div>
+        <p class="hint-line">${esc(gate.desc)} ${L('修改门锁类型会重置下方能力需求；之后可继续自定义勾选。', 'Changing the gate type resets the ability requirements below; you can then customize them.')}</p>
+        <div class="section-label">${L('能力需求', 'Ability Requirements')}</div>
+        ${app.project.abilities.length ? `<div class="check-grid">${app.project.abilities.map(ability => `<label class="check-field"><input type="checkbox" data-field="requires" data-ability="${esc(ability.id)}" ${link.requires.includes(ability.id) ? 'checked' : ''}><span>${esc(MV.abilityName(app.project, ability.id))}</span></label>`).join('')}</div>` : `<p class="hint-line">${L('项目能力表为空，请先在项目检查器中添加能力。', 'The project ability list is empty. Add abilities in the project inspector first.')}</p>`}
+        ${missingAbilities.length ? `<div class="req-list">${missingAbilities.map(id => `<span class="req-chip missing">${L('缺失', 'Missing')}: ${esc(id)}</span>`).join('')}</div>` : ''}
+        <div class="section-label">${L('状态', 'Status')}</div>
         <div class="req-list">
-          ${link.requires.length ? link.requires.map(req => `<span class="req-chip ${app.analysis.abilities.includes(req) ? '' : 'missing'}">${esc(MV.abilityName(app.project, req))}</span>`).join('') : '<span class="req-chip">无能力门槛</span>'}
-          ${link.keyReq ? `<span class="req-chip ${app.analysis.keys >= link.keyReq ? '' : 'missing'}">钥匙 ${app.analysis.keys} / ${link.keyReq}</span>` : ''}
+          ${link.requires.length ? link.requires.map(req => `<span class="req-chip ${app.analysis.abilities.includes(req) ? '' : 'missing'}">${esc(MV.abilityName(app.project, req))}</span>`).join('') : `<span class="req-chip">${L('无能力门槛', 'No ability requirement')}</span>`}
+          ${link.keyReq ? `<span class="req-chip ${app.analysis.keys >= link.keyReq ? '' : 'missing'}">${L('钥匙', 'Keys')} ${app.analysis.keys} / ${link.keyReq}</span>` : ''}
         </div>
-        <label class="field" style="margin-top:10px"><span>备注</span><textarea data-field="note" rows="2">${esc(link.note)}</textarea></label>
+        <label class="field" style="margin-top:10px"><span>${L('备注', 'Note')}</span><textarea data-field="note" rows="2">${esc(link.note)}</textarea></label>
       </div>
       <div class="btn-row">
-        <button class="btn" data-action="swap-link">反向 A/B</button>
-        <button class="btn" data-action="focus">定位连接</button>
-        <button class="btn btn-danger" data-action="delete-link">删除连接</button>
+        <button class="btn" data-action="swap-link">${L('反向 A/B', 'Swap A/B')}</button>
+        <button class="btn" data-action="focus">${L('定位连接', 'Focus Link')}</button>
+        <button class="btn btn-danger" data-action="delete-link">${L('删除连接', 'Delete Link')}</button>
       </div>`;
   }
 
@@ -827,30 +837,30 @@
     const room = MV.findRoom(app.project, item.room);
     const kind = MV.itemKindById(item.kind);
     const reachable = app.analysis.reachable.includes(item.room);
-    const grantName = item.grants ? MV.abilityName(app.project, item.grants) : '无';
-    return `${inspectorHead('ITEM / 物品', item.name, [
+    const grantName = item.grants ? MV.abilityName(app.project, item.grants) : L('无', 'None');
+    return `${inspectorHead(L('ITEM / 物品', 'ITEM'), item.name, [
       { text: kind.code },
       { text: room ? room.name : item.room },
       { text: reachable ? 'REACHABLE' : 'UNREACHABLE', solid: !reachable }
     ])}
       <div class="form-grid">
-        <label class="field"><span>名称</span><input data-field="name" value="${esc(item.name)}"></label>
+        <label class="field"><span>${L('名称', 'Name')}</span><input data-field="name" value="${esc(item.name)}"></label>
         <div class="form-grid two">
-          <label class="field"><span>类别</span><select data-field="kind">${MV.ITEM_KINDS.map(k => `<option value="${k.id}" ${k.id === item.kind ? 'selected' : ''}>${k.name}</option>`).join('')}</select></label>
-          <label class="field"><span>所在房间</span><select data-field="room">${app.project.rooms.map(r => `<option value="${esc(r.id)}" ${r.id === item.room ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select></label>
+          <label class="field"><span>${L('类别', 'Kind')}</span><select data-field="kind">${MV.ITEM_KINDS.map(k => `<option value="${k.id}" ${k.id === item.kind ? 'selected' : ''}>${k.name}</option>`).join('')}</select></label>
+          <label class="field"><span>${L('所在房间', 'Room')}</span><select data-field="room">${app.project.rooms.map(r => `<option value="${esc(r.id)}" ${r.id === item.room ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select></label>
         </div>
-        <label class="field"><span>授予能力</span><select data-field="grants">
-          <option value="">不授予</option>
-          ${app.project.abilities.map(a => `<option value="${esc(a.id)}" ${a.id === item.grants ? 'selected' : ''}>${esc(a.name)} · ${esc(a.id)}</option>`).join('')}
+        <label class="field"><span>${L('授予能力', 'Grants Ability')}</span><select data-field="grants">
+          <option value="">${L('不授予', 'None')}</option>
+          ${app.project.abilities.map(a => `<option value="${esc(a.id)}" ${a.id === item.grants ? 'selected' : ''}>${esc(MV.abilityName(app.project, a.id))} · ${esc(a.id)}</option>`).join('')}
         </select></label>
-        ${item.kind === 'key' ? `<div class="form-grid two">${numberField('钥匙数量', 'keyCount', item.keyCount, 1, 1)}<div></div></div>` : ''}
-        <label class="check-field"><input type="checkbox" data-field="optional" ${item.optional ? 'checked' : ''}><span>可选内容（不参与主线判定）</span></label>
-        <label class="field"><span>备注</span><textarea data-field="note" rows="2">${esc(item.note)}</textarea></label>
+        ${item.kind === 'key' ? `<div class="form-grid two">${numberField(L('钥匙数量', 'Key Count'), 'keyCount', item.keyCount, 1, 1)}<div></div></div>` : ''}
+        <label class="check-field"><input type="checkbox" data-field="optional" ${item.optional ? 'checked' : ''}><span>${L('可选内容（不参与主线判定）', 'Optional (ignored by the main path)')}</span></label>
+        <label class="field"><span>${L('备注', 'Note')}</span><textarea data-field="note" rows="2">${esc(item.note)}</textarea></label>
       </div>
-      <p class="hint-line">授予能力：拾取后立即加入能力集合。用于能力道具、Boss 旗标或唯一钥匙。钥匙数量：会计入全局钥匙预算。</p>
+      <p class="hint-line">${L('授予能力：拾取后立即加入能力集合。用于能力道具、Boss 旗标或唯一钥匙。钥匙数量：会计入全局钥匙预算。', 'Grants ability: adds the ability as soon as the item is collected. Use it for ability items, boss flags or unique keys. Key count: contributes to the global key budget.')}</p>
       <div class="btn-row">
-        <button class="btn" data-action="focus">定位物品</button>
-        <button class="btn btn-danger" data-action="delete-item">删除物品</button>
+        <button class="btn" data-action="focus">${L('定位物品', 'Focus Item')}</button>
+        <button class="btn btn-danger" data-action="delete-item">${L('删除物品', 'Delete Item')}</button>
       </div>`;
   }
 
@@ -859,81 +869,81 @@
     if (!region) return inspectorProject();
     const rooms = app.project.rooms.filter(room => room.region === id);
     const items = app.project.items.filter(item => rooms.some(room => room.id === item.room));
-    return `${inspectorHead('REGION / 区域', region.name, [
+    return `${inspectorHead(L('REGION / 区域', 'REGION'), region.name, [
       { text: region.code },
       { text: rooms.length + ' ROOMS' },
       { text: items.length + ' ITEMS' }
     ])}
       <div class="form-grid">
-        <label class="field"><span>名称</span><input data-field="name" value="${esc(region.name)}"></label>
+        <label class="field"><span>${L('名称', 'Name')}</span><input data-field="name" value="${esc(region.name)}"></label>
         <div class="form-grid two">
-          <label class="field"><span>代号</span><input data-field="code" value="${esc(region.code)}" maxlength="6"></label>
-          <label class="field"><span>灰度色调</span><select data-field="tone">${MV.REGION_TONES.map(t => `<option value="${t.id}" ${t.id === region.tone ? 'selected' : ''}>TONE ${t.id} / ${t.color}</option>`).join('')}</select></label>
+          <label class="field"><span>${L('代号', 'Code')}</span><input data-field="code" value="${esc(region.code)}" maxlength="6"></label>
+          <label class="field"><span>${L('灰度色调', 'Gray Tone')}</span><select data-field="tone">${MV.REGION_TONES.map(t => `<option value="${t.id}" ${t.id === region.tone ? 'selected' : ''}>TONE ${t.id} / ${t.color}</option>`).join('')}</select></label>
         </div>
         <div class="form-grid two">
-          <label class="field"><span>区域颜色</span><input type="color" data-field="color" value="${esc(region.color)}"></label>
-          <div class="field"><span>颜色用途</span><div class="color-note">彩色模式下用于房间顶边、3D 体块、标签与连线。</div></div>
+          <label class="field"><span>${L('区域颜色', 'Region Color')}</span><input type="color" data-field="color" value="${esc(region.color)}"></label>
+          <div class="field"><span>${L('颜色用途', 'Color Usage')}</span><div class="color-note">${L('彩色模式下用于房间顶边、3D 体块、标签与连线。', 'In color mode, used for room top edges, 3D blocks, labels and links.')}</div></div>
         </div>
-        ${numberField('3D 基座高度', 'elev', region.elev, 10)}
+        ${numberField(L('3D 基座高度', '3D Base Elevation'), 'elev', region.elev, 10)}
       </div>
-      <p class="hint-line">区域用于给房间分组、着色和统计。新增房间会放入当前选中的区域。基座高度只影响 3D 视图，可把不同区域叠成不同楼层。</p>
+      <p class="hint-line">${L('区域用于给房间分组、着色和统计。新增房间会放入当前选中的区域。基座高度只影响 3D 视图，可把不同区域叠成不同楼层。', 'Regions group, color and count rooms. New rooms go into the current region. Base elevation only affects the 3D view and lets regions sit on different floors.')}</p>
       <div class="btn-row">
-        <button class="btn" data-action="set-current-region">设为当前区域</button>
-        <button class="btn" data-action="solo-region">仅显示此区域</button>
-        <button class="btn" data-action="focus-region">聚焦区域</button>
-        <button class="btn btn-danger" data-action="delete-region" ${rooms.length ? 'disabled title="先清空该区域的房间"' : ''}>删除区域</button>
+        <button class="btn" data-action="set-current-region">${L('设为当前区域', 'Set Current Region')}</button>
+        <button class="btn" data-action="solo-region">${L('仅显示此区域', 'Show Only This Region')}</button>
+        <button class="btn" data-action="focus-region">${L('聚焦区域', 'Focus Region')}</button>
+        <button class="btn btn-danger" data-action="delete-region" ${rooms.length ? 'disabled title="' + L('先清空该区域的房间', 'Empty this region first') + '"' : ''}>${L('删除区域', 'Delete Region')}</button>
       </div>
       <div class="btn-row">
-        <button class="btn btn-ghost" data-action="show-all-regions">显示全部区域</button>
+        <button class="btn btn-ghost" data-action="show-all-regions">${L('显示全部区域', 'Show All Regions')}</button>
       </div>`;
   }
 
   function inspectorProject() {
     const counts = MV.projectCounts(app.project);
     const errors = app.analysis.warnings.filter(w => w.level === 'error').length;
-    return `${inspectorHead('PROJECT / 项目', app.project.meta.title || '未命名路线', [
+    return `${inspectorHead(L('PROJECT / 项目', 'PROJECT'), app.project.meta.title || L('未命名路线', 'Untitled Route'), [
       { text: (app.project.meta.preset || 'custom').toUpperCase() },
       { text: counts.rooms + ' ROOMS' },
       { text: errors ? errors + ' ERRORS' : 'STRUCTURE OK', solid: true }
     ])}
       <div class="stat-grid">
-        <div class="stat-cell"><div class="s-label">REACHABLE</div><div class="s-value">${app.analysis.stats.reachableRooms}<span style="font-size:calc(11px * var(--font-scale));color:var(--ink-4)"> / ${counts.rooms}</span></div><div class="s-sub">从起点可达的房间</div></div>
-        <div class="stat-cell"><div class="s-label">KEYS</div><div class="s-value">${app.analysis.keys}<span style="font-size:calc(11px * var(--font-scale));color:var(--ink-4)"> / ${app.analysis.keysTotal}</span></div><div class="s-sub">已收集 / 全图钥匙</div></div>
-        <div class="stat-cell"><div class="s-label">GATES</div><div class="s-value">${app.analysis.openCount}<span style="font-size:calc(11px * var(--font-scale));color:var(--ink-4)"> / ${counts.links}</span></div><div class="s-sub">可通行 / 全部门锁</div></div>
-        <div class="stat-cell"><div class="s-label">ITEMS</div><div class="s-value">${counts.items}</div><div class="s-sub">${counts.optional} 个可选 / ${counts.bosses} 个 Boss</div></div>
+        <div class="stat-cell"><div class="s-label">REACHABLE</div><div class="s-value">${app.analysis.stats.reachableRooms}<span style="font-size:calc(11px * var(--font-scale));color:var(--ink-4)"> / ${counts.rooms}</span></div><div class="s-sub">${L('从起点可达的房间', 'Rooms reachable from start')}</div></div>
+        <div class="stat-cell"><div class="s-label">KEYS</div><div class="s-value">${app.analysis.keys}<span style="font-size:calc(11px * var(--font-scale));color:var(--ink-4)"> / ${app.analysis.keysTotal}</span></div><div class="s-sub">${L('已收集 / 全图钥匙', 'Collected / total keys')}</div></div>
+        <div class="stat-cell"><div class="s-label">GATES</div><div class="s-value">${app.analysis.openCount}<span style="font-size:calc(11px * var(--font-scale));color:var(--ink-4)"> / ${counts.links}</span></div><div class="s-sub">${L('可通行 / 全部门锁', 'Passable / total gates')}</div></div>
+        <div class="stat-cell"><div class="s-label">ITEMS</div><div class="s-value">${counts.items}</div><div class="s-sub">${counts.optional} ${L('个可选', 'optional')} / ${counts.bosses} ${L('个 Boss', 'bosses')}</div></div>
       </div>
       <div class="form-grid">
-        <label class="field"><span>项目标题</span><input data-field="title" value="${esc(app.project.meta.title || '未命名路线')}"></label>
+        <label class="field"><span>${L('项目标题', 'Project Title')}</span><input data-field="title" value="${esc(app.project.meta.title || L('未命名路线', 'Untitled Route'))}"></label>
         <div class="form-grid two">
-          <label class="field"><span>起点房间</span><select data-field="startRoom">${app.project.rooms.map(r => `<option value="${esc(r.id)}" ${r.id === app.project.startRoom ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select></label>
-          <label class="field"><span>终点房间</span><select data-field="goalRoom">${app.project.rooms.map(r => `<option value="${esc(r.id)}" ${r.id === app.project.goalRoom ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select></label>
+          <label class="field"><span>${L('起点房间', 'Start Room')}</span><select data-field="startRoom">${app.project.rooms.map(r => `<option value="${esc(r.id)}" ${r.id === app.project.startRoom ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select></label>
+          <label class="field"><span>${L('终点房间', 'Goal Room')}</span><select data-field="goalRoom">${app.project.rooms.map(r => `<option value="${esc(r.id)}" ${r.id === app.project.goalRoom ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select></label>
         </div>
-        <label class="field"><span>项目备注</span><textarea data-field="notes" rows="3">${esc(app.project.meta.notes)}</textarea></label>
+        <label class="field"><span>${L('项目备注', 'Project Notes')}</span><textarea data-field="notes" rows="3">${esc(app.project.meta.notes)}</textarea></label>
       </div>
-      <div class="section-label">起始能力</div>
+      <div class="section-label">${L('起始能力', 'Starting Abilities')}</div>
       <div class="check-grid">
-        ${app.project.abilities.map(a => `<label class="check-field"><input type="checkbox" data-field="startAbility" data-ability="${esc(a.id)}" ${app.project.startAbilities.includes(a.id) ? 'checked' : ''}><span>${esc(a.name)}</span></label>`).join('')}
+        ${app.project.abilities.map(a => `<label class="check-field"><input type="checkbox" data-field="startAbility" data-ability="${esc(a.id)}" ${app.project.startAbilities.includes(a.id) ? 'checked' : ''}><span>${esc(MV.abilityName(app.project, a.id))}</span></label>`).join('')}
       </div>
-      <div class="section-label">能力表</div>
+      <div class="section-label">${L('能力表', 'Ability List')}</div>
       <div class="ability-list">
         ${app.project.abilities.map(a => `<div class="ability-row">
-          <div><div class="a-name">${esc(a.name)}</div><div class="a-id">${esc(a.id)}</div></div>
-          <button class="ability-del" data-action="delete-ability" data-ability="${esc(a.id)}" title="删除能力">×</button>
+          <div><div class="a-name">${esc(MV.abilityName(app.project, a.id))}</div><div class="a-id">${esc(a.id)}</div></div>
+          <button class="ability-del" data-action="delete-ability" data-ability="${esc(a.id)}" title="${L('删除能力', 'Delete ability')}">×</button>
         </div>`).join('')}
       </div>
       <div class="inline-form">
-        <input id="newAbilityName" placeholder="新能力名称，例如：二段跳" maxlength="24">
-        <button data-action="add-ability" title="添加能力">+</button>
+        <input id="newAbilityName" placeholder="${L('新能力名称，例如：二段跳', 'New ability name, e.g. Double Jump')}" maxlength="24">
+        <button data-action="add-ability" title="${L('添加能力', 'Add ability')}">+</button>
       </div>
-      <p class="hint-line">能力表是门锁与道具的共享词汇。被引用的能力不能删除。</p>
+      <p class="hint-line">${L('能力表是门锁与道具的共享词汇。被引用的能力不能删除。', 'The ability list is the shared vocabulary for gates and items. Referenced abilities cannot be deleted.')}</p>
       <div class="btn-row">
-        <button class="btn" data-action="fit-all">适应全部</button>
-        <button class="btn" data-action="spread-layout">舒展布局</button>
-        <button class="btn" data-action="focus-goal">定位终点</button>
-        <button class="btn" data-action="open-presets">载入预设</button>
+        <button class="btn" data-action="fit-all">${L('适应全部', 'Fit All')}</button>
+        <button class="btn" data-action="spread-layout">${L('舒展布局', 'Spread Layout')}</button>
+        <button class="btn" data-action="focus-goal">${L('定位终点', 'Focus Goal')}</button>
+        <button class="btn" data-action="open-presets">${L('载入预设', 'Load Preset')}</button>
       </div>
-      <div class="section-label">参考</div>
-      <div class="hint-line">${esc(app.project.meta.preset || 'custom')} · ${counts.regions} 区域 · ${counts.rooms} 房间 · ${counts.links} 连接</div>`;
+      <div class="section-label">${L('参考', 'Reference')}</div>
+      <div class="hint-line">${esc(app.project.meta.preset || 'custom')} · ${counts.regions} ${L('区域', 'regions')} · ${counts.rooms} ${L('房间', 'rooms')} · ${counts.links} ${L('连接', 'links')}</div>`;
   }
 
   function numberField(label, field, value, step, min) {
@@ -1000,7 +1010,7 @@
   function applyField(field, value, target) {
     const sel = app.selection;
     if (!sel) {
-      if (field === 'title') { app.project.meta.title = value || '未命名路线'; return true; }
+      if (field === 'title') { app.project.meta.title = value || L('未命名路线', 'Untitled Route'); return true; }
       if (field === 'startRoom') { app.project.startRoom = value; return true; }
       if (field === 'goalRoom') { app.project.goalRoom = value; return true; }
       if (field === 'notes') { app.project.meta.notes = value; return true; }
@@ -1016,7 +1026,7 @@
     if (sel.type === 'room') {
       const room = MV.findRoom(app.project, sel.id);
       if (!room) return false;
-      if (field === 'name') { room.name = value || '未命名房间'; return true; }
+      if (field === 'name') { room.name = value || L('未命名房间', 'Untitled Room'); return true; }
       if (field === 'region') { room.region = value; app.currentRegion = value; return true; }
       if (field === 'type') { room.type = value; return true; }
       if (field === 'note') { room.note = value; return true; }
@@ -1058,7 +1068,7 @@
     if (sel.type === 'item') {
       const item = MV.findItem(app.project, sel.id);
       if (!item) return false;
-      if (field === 'name') { item.name = value || '未命名物品'; return true; }
+      if (field === 'name') { item.name = value || L('未命名物品', 'Untitled Item'); return true; }
       if (field === 'kind') {
         item.kind = value;
         if (value === 'upgrade') item.optional = true;
@@ -1075,7 +1085,7 @@
     if (sel.type === 'region') {
       const region = app.project.regions.find(r => r.id === sel.id);
       if (!region) return false;
-      if (field === 'name') { region.name = value || '未命名区域'; return true; }
+      if (field === 'name') { region.name = value || L('未命名区域', 'Untitled Region'); return true; }
       if (field === 'code') { region.code = String(value || 'ZONE').toUpperCase().slice(0, 6); return true; }
       if (field === 'tone') { region.tone = MV.clamp(Number(value) || 0, 0, MV.REGION_TONES.length - 1); return true; }
       if (field === 'color') { region.color = MV.normalizeHexColor(value, region.color); return true; }
@@ -1106,7 +1116,7 @@
     else if (action === 'fit-all') fitAll();
     else if (action === 'spread-layout') spreadLayout();
     else if (action === 'swap-link') swapLink();
-    else if (action === 'set-current-region') { app.currentRegion = app.selection.id; renderRegionList(); persistUI(); toast('当前区域已切换'); }
+    else if (action === 'set-current-region') { app.currentRegion = app.selection.id; renderRegionList(); persistUI(); toast(L('当前区域已切换', 'Current region changed')); }
     else if (action === 'solo-region') { if (app.selection && app.selection.type === 'region') soloRegion(app.selection.id); }
     else if (action === 'show-all-regions') showAllRegions();
     else if (action === 'focus-region') focusRegion(app.selection.id);
@@ -1145,7 +1155,7 @@
         <div class="tl-step-label">STEP ${String(step).padStart(2, '0')}${isGoal ? ' / GOAL' : ''}</div>
         ${entries.map(entry => {
           const room = roomById[entry.roomId];
-          return `<button class="tl-item" data-select-room="${esc(entry.roomId)}" title="定位 ${esc(room ? room.name : entry.roomId)}">
+          return `<button class="tl-item" data-select-room="${esc(entry.roomId)}" title="${L('定位', 'Focus')} ${esc(room ? room.name : entry.roomId)}">
             <span>${esc(entry.name)}</span>
             <span class="tl-room">${esc(room ? room.name : entry.roomId)}</span>
             ${entry.optional ? '<span class="tl-unlock">OPT</span>' : ''}
@@ -1153,7 +1163,7 @@
         }).join('')}
         ${unlocks ? `<div class="tl-unlocks">${unlocks}</div>` : ''}
       </div>`;
-    }).join('') : '<div class="hint-line">还没有可收集的道具。放置能力道具、钥匙或 Boss 后会生成时间轴。</div>';
+    }).join('') : `<div class="hint-line">${L('还没有可收集的道具。放置能力道具、钥匙或 Boss 后会生成时间轴。', 'No collectible items yet. Place ability items, keys or bosses to generate a timeline.')}</div>`;
 
     const regionHTML = a.regionStats.map(region => {
       const pct = region.totalRooms ? Math.round(region.reachableRooms / region.totalRooms * 100) : 0;
@@ -1166,25 +1176,27 @@
     }).join('');
 
     const gateHTML = a.gateStats.length ? `<table class="gate-table">
-      <thead><tr><th>门锁</th><th>可通行 / 总数</th></tr></thead>
+      <thead><tr><th>${L('门锁', 'Gate')}</th><th>${L('可通行 / 总数', 'Passable / total')}</th></tr></thead>
       <tbody>${a.gateStats.map(gate => `<tr class="${gate.open === gate.total ? '' : 'is-locked'}"><td>${gate.code} · ${esc(gate.name)}</td><td>${gate.open} / ${gate.total}</td></tr>`).join('')}</tbody>
-    </table>` : '<div class="hint-line">还没有连接。</div>';
+    </table>` : `<div class="hint-line">${L('还没有连接。', 'No links yet.')}</div>`;
 
     const pathHTML = a.path.length ? a.path.map((roomId, i) => {
       const room = roomById[roomId];
       return `<button class="path-row" data-select-room="${esc(roomId)}"><span class="pi">${String(i + 1).padStart(2, '0')}</span><span>${esc(room ? room.name : roomId)}</span></button>`;
-    }).join('') : '<div class="hint-line">终点不可达或尚未设置终点。</div>';
+    }).join('') : `<div class="hint-line">${L('终点不可达或尚未设置终点。', 'The goal is unreachable or not set.')}</div>`;
 
     const warningsHTML = ordered.length ? ordered.map(w => `<div class="warn-card is-${w.level}">
       <div class="w-head">${w.level === 'error' ? 'ERROR' : (w.level === 'warn' ? 'WARNING' : 'INFO')} / ${esc(w.title)}</div>
       <div>${esc(w.text)}</div>
-    </div>`).join('') : '<div class="warn-card is-info"><div class="w-head">INFO / 结构检查</div><div>未发现结构性问题。</div></div>';
+    </div>`).join('') : `<div class="warn-card is-info"><div class="w-head">INFO / ${L('结构检查', 'STRUCTURE CHECK')}</div><div>${L('未发现结构性问题。', 'No structural issues found.')}</div></div>`;
 
     els.rightBody.innerHTML = `
       <div class="progress-status ${a.goalReached ? 'is-ok' : 'is-bad'}">
         <div class="ps-label">ROUTE STATUS</div>
-        <div class="ps-value">${a.goalReached ? '路线闭合' : '路线未闭合'}</div>
-        <div class="ps-sub">${a.goalReached ? '终点可达 · 主线 ' + a.path.length + ' 个房间 · ' + (a.goalReachedStep + 1) + ' 个阶段' : '从起点无法抵达终点，见下方警告。'}</div>
+        <div class="ps-value">${a.goalReached ? L('路线闭合', 'Route Closed') : L('路线未闭合', 'Route Open')}</div>
+        <div class="ps-sub">${a.goalReached
+          ? L('终点可达 · 主线 ' + a.path.length + ' 个房间 · ' + (a.goalReachedStep + 1) + ' 个阶段', 'Goal reachable · ' + a.path.length + ' rooms on the main path · ' + (a.goalReachedStep + 1) + ' phases')
+          : L('从起点无法抵达终点，见下方警告。', 'The goal cannot be reached from the start. See warnings below.')}</div>
       </div>
       <div class="stat-grid">
         <div class="stat-cell"><div class="s-label">REACHABLE ROOMS</div><div class="s-value">${a.stats.reachableRooms}<span style="font-size:calc(11px * var(--font-scale));color:var(--ink-4)"> / ${a.stats.rooms}</span></div><div class="bar"><i style="width:${a.stats.rooms ? a.stats.reachableRooms / a.stats.rooms * 100 : 0}%"></i></div></div>
@@ -1192,21 +1204,21 @@
         <div class="stat-cell"><div class="s-label">KEYS</div><div class="s-value">${a.keys}<span style="font-size:calc(11px * var(--font-scale));color:var(--ink-4)"> / ${a.keysTotal}</span></div><div class="bar"><i style="width:${a.keysTotal ? a.keys / a.keysTotal * 100 : 0}%"></i></div></div>
         <div class="stat-cell"><div class="s-label">ACQUIRED</div><div class="s-value">${a.stats.collectedItems}<span style="font-size:calc(11px * var(--font-scale));color:var(--ink-4)"> / ${a.stats.items}</span></div><div class="bar"><i style="width:${a.stats.items ? a.stats.collectedItems / a.stats.items * 100 : 0}%"></i></div></div>
       </div>
-      <div class="section-label">警告</div>
+      <div class="section-label">${L('警告', 'Warnings')}</div>
       <div class="warn-list">${warningsHTML}</div>
-      <div class="section-label">进度时间轴</div>
+      <div class="section-label">${L('进度时间轴', 'Progression Timeline')}</div>
       <div class="timeline">${timelineHTML}</div>
-      <div class="section-label">区域覆盖</div>
-      <div class="region-coverage">${regionHTML || '<div class="hint-line">没有区域。</div>'}</div>
-      <div class="section-label">门锁统计</div>
+      <div class="section-label">${L('区域覆盖', 'Region Coverage')}</div>
+      <div class="region-coverage">${regionHTML || `<div class="hint-line">${L('没有区域。', 'No regions.')}</div>`}</div>
+      <div class="section-label">${L('门锁统计', 'Gate Stats')}</div>
       ${gateHTML}
-      <div class="section-label">主线路径</div>
+      <div class="section-label">${L('主线路径', 'Main Path')}</div>
       <div class="path-list">${pathHTML}</div>
-      <div class="section-label">显示</div>
-      <div class="toggle-line"><span>主线高亮</span><label class="check-field"><input type="checkbox" data-progress-layer="path" ${app.layers.path ? 'checked' : ''}><span>显示</span></label></div>
-      <div class="toggle-line"><span>阶段着色</span><label class="check-field"><input type="checkbox" data-progress-layer="phases" ${app.layers.phases ? 'checked' : ''}><span>显示</span></label></div>
-      <div class="toggle-line"><span>房间名称</span><label class="check-field"><input type="checkbox" data-progress-layer="names" ${app.layers.names ? 'checked' : ''}><span>显示</span></label></div>
-      <div class="btn-row"><button class="btn btn-ghost btn-wide" data-action="focus-goal">定位终点房间</button></div>
+      <div class="section-label">${L('显示', 'Display')}</div>
+      <div class="toggle-line"><span>${L('主线高亮', 'Main path')}</span><label class="check-field"><input type="checkbox" data-progress-layer="path" ${app.layers.path ? 'checked' : ''}><span>${L('显示', 'Show')}</span></label></div>
+      <div class="toggle-line"><span>${L('阶段着色', 'Phase colors')}</span><label class="check-field"><input type="checkbox" data-progress-layer="phases" ${app.layers.phases ? 'checked' : ''}><span>${L('显示', 'Show')}</span></label></div>
+      <div class="toggle-line"><span>${L('房间名称', 'Room names')}</span><label class="check-field"><input type="checkbox" data-progress-layer="names" ${app.layers.names ? 'checked' : ''}><span>${L('显示', 'Show')}</span></label></div>
+      <div class="btn-row"><button class="btn btn-ghost btn-wide" data-action="focus-goal">${L('定位终点房间', 'Focus Goal Room')}</button></div>
     `;
   }
 
@@ -1231,15 +1243,100 @@
         thermalVisor: '热能视镜', xRayVisor: 'X 光视镜', variaSuit: '瓦利亚服',
         gravitySuit: '重力服', phazonSuit: 'Phazon 服'
       };
+      const mp1NamesEn = {
+        missile: 'Missile Launcher', iceBeam: 'Ice Beam', waveBeam: 'Wave Beam', plasmaBeam: 'Plasma Beam',
+        morphBall: 'Morph Ball', bomb: 'Morph Ball Bomb', boostBall: 'Boost Ball', spiderBall: 'Spider Ball',
+        grappleBeam: 'Grapple Beam', powerBomb: 'Power Bomb', scanVisor: 'Scan Visor',
+        thermalVisor: 'Thermal Visor', xRayVisor: 'X-Ray Visor', variaSuit: 'Varia Suit',
+        gravitySuit: 'Gravity Suit', phazonSuit: 'Phazon Suit'
+      };
       const reqName = id => {
+        if (MV.getLang() === 'en' && mp1NamesEn[id]) return mp1NamesEn[id];
         const found = MV.abilityName(app.project, id);
         return found === id ? (mp1Names[id] || id) : found;
       };
       const reqs = g.requires.length
         ? g.requires.map(reqName).join(' + ')
-        : (g.keyReq ? g.keyReq + ' 把钥匙' : '无 / 自定义');
+        : (g.keyReq ? L(g.keyReq + ' 把钥匙', g.keyReq + ' keys') : L('无 / 自定义', 'None / custom'));
       return `<tr><td>${g.code} · ${g.name}</td><td>${esc(reqs)}</td><td>${esc(g.desc)}</td></tr>`;
     }).join('');
+
+    if (MV.getLang() === 'en') {
+      els.rightBody.innerHTML = `<div class="guide">
+      <h1>Design Guide</h1>
+      <div class="guide-kicker">METROIDVANIA / LEVEL ROUTE NOTES / MP-01</div>
+
+      <section>
+        <h2>00 / Define the “Lock” First</h2>
+        <p>A Metroidvania route is defined less by room count than by the <strong>causal chain of locks and keys</strong>. Every gate should answer three questions: what ability does it require, where is that ability obtained, and which gates must be passed to obtain it? Route Forge repeats this reasoning automatically until the route closes or deadlocks.</p>
+        <div class="guide-quote">A good Metroidvania map keeps the player moving between “I remember a door I couldn't open” and “I can open it now.”</div>
+      </section>
+
+      <section>
+        <h2>01 / Anatomy of Metroid Prime</h2>
+        <div class="guide-card"><h3>Region ring and hub</h3><p>Tallon Overworld holds the landing site and the player's base. Magmoor Caverns is the map's subway, connecting every region except Impact Crater, and contains no boss. Chozo Ruins sits to the northeast; Phendrana Drifts can only be reached through Magmoor; Phazon Mines is the three-level industrial endgame in the south; Impact Crater is sealed by twelve Chozo Artifacts. This “hub + radial regions + isolated endgame” structure is the skeleton of preset 01.</p></div>
+        <div class="guide-card"><h3>Gate matrix</h3><p>MP1 encodes abilities directly into doors: blue doors, Missile Doors, Ice, Wave and Plasma Doors, plus Morph Ball tunnels, Bomb Slots, Boost Ball half-pipes, Spider Ball tracks and Grapple Points. The gate presets in the inspector are exactly this matrix; any link can carry additional custom ability requirements.</p></div>
+        <div class="guide-card"><h3>Spatial locks, not just doors</h3><p>The Morph Ball turns room geometry into a key: vents, half-pipes, magnetic tracks and Bomb Slots are all spatial expressions of the same ability set. This matters in 3D—the same lock may become a shaft, a rail, or a slope that requires a boost.</p></div>
+        <div class="guide-card"><h3>Visors and soft gates</h3><p>Thermal Visor, X-Ray Visor, Varia Suit, Gravity Suit and Phazon Suit turn “can't see it,” “can't cross it” and “can't survive it” into gates. They are softer than hard doors and are ideal for creating the backtracking moment of “so this was passable all along.” The preset keeps key nodes such as Thermal Visor for Thardus, X-Ray Visor for the final battle, and Gravity Suit for the sunken frigate.</p></div>
+        <div class="guide-card"><h3>Artifact budget</h3><p>The twelve Artifacts are a global key budget rather than single-use keys. They turn the endgame from “fight one more boss” into “re-understand the entire map.” The progress panel shows collected keys and the seal requirement in real time, and reports an error when the budget is insufficient.</p></div>
+        <div class="guide-card"><h3>The one-way prologue</h3><p>Orpheon is a playable prologue with no return after escape. The preset expresses it as a one-way link. One-way edges are essential to route design: they separate the starting region from the backtrackable map in logic.</p></div>
+      </section>
+
+      <section>
+        <h2>02 / How This Tool Supports 3D Metroidvania</h2>
+        <ul>
+          <li><strong>2D route</strong> answers “in what order does the player acquire what”—useful for lock chains, key budgets and optional-content density.</li>
+          <li><strong>3D map</strong> answers “what do these rooms look like and how do they connect vertically,” using MP1's massing language: rooms are blocks, links are solid corridors and shafts, regions are base plates.</li>
+          <li><strong>Phase colors</strong> project reachability results back onto the map so the early, mid and late game are visible at a glance.</li>
+          <li><strong>3D corridors</strong>: normal corridors use the target region color, locked corridors use the gate color; shafts model regional elevators and door frames mark connection points.</li>
+          <li><strong>Semantic color</strong>: region, phase, gate and item colors each carry different information and can be customized in the palette panel.</li>
+          <li><strong>Region filter</strong>: show one or more regions; filtering only affects display, while analysis and route validation still use the full project.</li>
+          <li><strong>Main path highlight</strong> shows the shortest-path skeleton. It does not replace the full route, but quickly exposes “main path too long / too short / endgame region revealed too early.”</li>
+          <li><strong>Gate stats</strong> reveal whether gate types are too uniform. A map made entirely of Missile Doors flattens the ability rhythm.</li>
+          <li><strong>Ability lock tree</strong> orders abilities, keys, gates and later items by acquisition step to inspect ability rhythm, key budget and soft locks.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>03 / Ability Lock Tree</h2>
+        <p>The lock tree arranges “ability / key → gate → later item” vertically by <strong>acquisition step</strong>. Top to bottom is progression order: each row is a phase, with abilities, keys, bosses or optional upgrades above and the gates unlocked in that step below.</p>
+        <div class="guide-card"><h3>How to read it</h3><p>Every gate card states “← requires / → leads to,” for example “← Varia Suit → Magmoor Lake.” The top holds the start room and global key pool; STEP 00 through the endgame advance downward. Dashed cards are optional upgrades; cards with a vertical line are on the main path.</p></div>
+        <div class="guide-card"><h3>How to use it</h3><p>Click a card to inspect the matching item or link. Double-click a card or press F to switch to 2D and focus it. Drag to scroll through later steps, use the wheel to zoom, and press FIT to see the whole timeline. MAIN dims everything outside the main path so you can check ability and gate rhythm.</p></div>
+      </section>
+
+      <section>
+        <h2>04 / Design Checklist</h2>
+        <ul>
+          <li>Does the starting region contain a “safe room” that teaches controls and map language?</li>
+          <li>Does the player gain at least one movement-changing ability in the first 15 minutes?</li>
+          <li>Does each region have a memorable landmark room or visual motif?</li>
+          <li>Is there at least one shortcut or foreshadowing moment that is seen early and used later?</li>
+          <li>Is there a save point, supply cache or safe room before each boss?</li>
+          <li>Are endgame keys spread across different regions, forcing the player to revisit the whole map?</li>
+          <li>Does the shortest main path avoid becoming a linear “visit every room” checklist?</li>
+          <li>Do optional upgrades reward exploration without becoming mandatory?</li>
+          <li>Are one-way doors used for tension rather than for creating soft locks?</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>05 / Gate Reference</h2>
+        <table class="matrix">
+          <thead><tr><th>Type</th><th>Requirement</th><th>Notes</th></tr></thead>
+          <tbody>${gateRows}</tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>06 / Sources & Notes</h2>
+        <p>Presets are <strong>structured references</strong> assembled from public maps, walkthroughs and wikis. They demonstrate lock chains and region relationships rather than reproducing an official map one-to-one. Room coordinates, some item placements and gate directions are simplified for design demonstration.</p>
+        <div class="guide-sources">
+          ${sources.map(src => `<a href="${esc(src[1])}" target="_blank" rel="noreferrer">${esc(src[0])} ↗</a>`).join('')}
+        </div>
+      </section>
+    </div>`;
+      return;
+    }
 
     els.rightBody.innerHTML = `<div class="guide">
       <h1>设计指南</h1>
@@ -1401,7 +1498,7 @@
     app.analysis = MV.analyze(app.project);
     markDirty();
     refreshAll();
-    toast('已撤销');
+    toast(L('已撤销', 'Undone'));
   }
 
   function redo() {
@@ -1414,7 +1511,7 @@
     app.analysis = MV.analyze(app.project);
     markDirty();
     refreshAll();
-    toast('已重做');
+    toast(L('已重做', 'Redone'));
   }
 
   function validateSelection() {
@@ -1436,8 +1533,8 @@
     if (!sel) return;
     if (sel.type === 'region') {
       const roomCount = app.project.rooms.filter(room => room.region === sel.id).length;
-      if (roomCount) { toast('该区域还有房间，先清空再删除', true); return; }
-      if (app.project.regions.length <= 1) { toast('至少保留一个区域', true); return; }
+      if (roomCount) { toast(L('该区域还有房间，先清空再删除', 'This region still has rooms. Empty it before deleting.'), true); return; }
+      if (app.project.regions.length <= 1) { toast(L('至少保留一个区域', 'Keep at least one region'), true); return; }
       snapshot();
       app.project.regions = app.project.regions.filter(region => region.id !== sel.id);
       app.hiddenRegions.delete(sel.id);
@@ -1446,7 +1543,7 @@
       app.analysis = MV.analyze(app.project);
       markDirty();
       refreshAll();
-      toast('区域已删除');
+      toast(L('区域已删除', 'Region deleted'));
       return;
     }
     if (sel.type === 'room') {
@@ -1467,7 +1564,7 @@
       validateSelection();
       markDirty();
       refreshAll();
-      toast('房间已删除（可撤销）');
+      toast(L('房间已删除（可撤销）', 'Room deleted (undoable)'));
       return;
     }
     if (sel.type === 'link') {
@@ -1477,7 +1574,7 @@
       app.analysis = MV.analyze(app.project);
       markDirty();
       refreshAll();
-      toast('连接已删除');
+      toast(L('连接已删除', 'Link deleted'));
       return;
     }
     if (sel.type === 'item') {
@@ -1487,7 +1584,7 @@
       app.analysis = MV.analyze(app.project);
       markDirty();
       refreshAll();
-      toast('物品已删除');
+      toast(L('物品已删除', 'Item deleted'));
     }
   }
 
@@ -1498,7 +1595,7 @@
     snapshot();
     const room = MV.clone(source);
     room.id = MV.uid('room');
-    room.name = source.name + ' 副本';
+    room.name = source.name + L(' 副本', ' Copy');
     room.x = source.x + 28;
     room.y = source.y + 28;
     app.project.rooms.push(room);
@@ -1515,12 +1612,12 @@
     app.analysis = MV.analyze(app.project);
     markDirty();
     refreshAll();
-    toast('房间已复制' + (items.length ? '（含 ' + items.length + ' 个物品）' : '') + '（连接不复制）');
+    toast(L('房间已复制', 'Room duplicated') + (items.length ? L('（含 ' + items.length + ' 个物品）', ' (with ' + items.length + ' items)') : '') + L('（连接不复制）', ' (links not copied)'));
   }
 
   function copyRoomSelection() {
     if (!app.selection || app.selection.type !== 'room') {
-      toast('请先选择一个房间再复制', true);
+      toast(L('请先选择一个房间再复制', 'Select a room before copying'), true);
       return;
     }
     const room = MV.findRoom(app.project, app.selection.id);
@@ -1530,12 +1627,12 @@
       items: MV.clone(app.project.items.filter(item => item.room === room.id)),
       pastes: 0
     };
-    toast('已复制房间' + (roomClipboard.items.length ? '与 ' + roomClipboard.items.length + ' 个物品' : '') + '（Ctrl+V 粘贴）');
+    toast(L('已复制房间', 'Room copied') + (roomClipboard.items.length ? L('与 ' + roomClipboard.items.length + ' 个物品', ' with ' + roomClipboard.items.length + ' items') : '') + L('（Ctrl+V 粘贴）', ' (Ctrl+V to paste)'));
   }
 
   function pasteRoomClipboard() {
     if (!roomClipboard) {
-      toast('剪贴板为空：先选中房间并按 Ctrl+C', true);
+      toast(L('剪贴板为空：先选中房间并按 Ctrl+C', 'Clipboard is empty. Select a room and press Ctrl+C.'), true);
       return;
     }
     const source = roomClipboard.room;
@@ -1546,7 +1643,7 @@
     const offset = 30 * (++roomClipboard.pastes);
     const room = MV.clone(source);
     room.id = MV.uid('room');
-    room.name = source.name + ' 副本';
+    room.name = source.name + L(' 副本', ' Copy');
     room.region = regionId;
     room.x = source.x + offset;
     room.y = source.y + offset;
@@ -1563,7 +1660,7 @@
     app.analysis = MV.analyze(app.project);
     markDirty();
     refreshAll();
-    toast('已粘贴房间' + (roomClipboard.items.length ? '与 ' + roomClipboard.items.length + ' 个物品' : '') + '（连接不复制）');
+    toast(L('已粘贴房间', 'Room pasted') + (roomClipboard.items.length ? L('与 ' + roomClipboard.items.length + ' 个物品', ' with ' + roomClipboard.items.length + ' items') : '') + L('（连接不复制）', ' (links not copied)'));
   }
 
   function nudgeSelection(dx, dy) {
@@ -1588,7 +1685,7 @@
     const index = app.project.regions.length;
     const region = {
       id: MV.uid('region'),
-      name: '新区域 ' + (index + 1),
+      name: L('新区域 ', 'New Region ') + (index + 1),
       code: 'Z' + String(index + 1).padStart(2, '0'),
       tone: index % MV.REGION_TONES.length,
       color: MV.REGION_COLORS[index % MV.REGION_COLORS.length]
@@ -1600,7 +1697,7 @@
     app.analysis = MV.analyze(app.project);
     markDirty();
     refreshAll();
-    toast('区域已添加');
+    toast(L('区域已添加', 'Region added'));
   }
 
   function selectionInRegion(regionId) {
@@ -1665,7 +1762,7 @@
 
   function showAllRegions() {
     if (!app.hiddenRegions.size) {
-      toast('当前已显示全部区域');
+      toast(L('当前已显示全部区域', 'All regions are already visible'));
       return;
     }
     app.hiddenRegions.clear();
@@ -1677,7 +1774,7 @@
     else fit3D();
     updateStatus();
     persistUI();
-    toast('已显示全部区域');
+    toast(L('已显示全部区域', 'All regions shown'));
   }
 
   function soloRegion(regionId) {
@@ -1695,7 +1792,7 @@
     else fit3D();
     updateStatus();
     persistUI();
-    toast('仅显示区域：' + region.name);
+    toast(L('仅显示区域：', 'Showing only region: ') + region.name);
   }
 
   function spreadLayout() {
@@ -1719,33 +1816,33 @@
     markDirty();
     app.analysis = MV.analyze(app.project);
     refreshAll();
-    toast('布局已舒展（可撤销）');
+    toast(L('布局已舒展（可撤销）', 'Layout spread (undoable)'));
   }
 
   function addItemToRoom(roomId) {
     const room = MV.findRoom(app.project, roomId);
-    if (!room) { toast('请先选择一间房', true); return; }
+    if (!room) { toast(L('请先选择一间房', 'Select a room first'), true); return; }
     snapshot();
     const kind = app.itemKind;
-    let name = '新物品';
+    let name = L('新物品', 'New Item');
     let grants = '';
     let optional = false;
     if (kind === 'ability') {
       const granted = new Set(app.project.items.filter(item => item.grants).map(item => item.grants));
       const ability = app.project.abilities.find(a => !granted.has(a.id));
       if (ability) {
-        name = ability.name + '道具';
+        name = MV.abilityName(app.project, ability.id) + L('道具', ' Item');
         grants = ability.id;
       } else {
-        name = '能力道具 ' + (app.project.items.filter(item => item.kind === 'ability').length + 1);
+        name = L('能力道具 ', 'Ability Item ') + (app.project.items.filter(item => item.kind === 'ability').length + 1);
       }
     } else if (kind === 'key') {
-      name = '钥匙 ' + (app.project.items.filter(item => item.kind === 'key').length + 1);
+      name = L('钥匙 ', 'Key ') + (app.project.items.filter(item => item.kind === 'key').length + 1);
     } else if (kind === 'upgrade') {
-      name = '可选强化 ' + (app.project.items.filter(item => item.kind === 'upgrade').length + 1);
+      name = L('可选强化 ', 'Optional Upgrade ') + (app.project.items.filter(item => item.kind === 'upgrade').length + 1);
       optional = true;
     } else if (kind === 'boss') {
-      name = 'Boss ' + (app.project.items.filter(item => item.kind === 'boss').length + 1);
+      name = L('Boss ', 'Boss ') + (app.project.items.filter(item => item.kind === 'boss').length + 1);
     }
     const item = {
       id: MV.uid('item'),
@@ -1765,7 +1862,7 @@
     markDirty();
     updateToolUI();
     refreshAll();
-    toast('已添加：' + item.name);
+    toast(L('已添加：', 'Added: ') + item.name);
   }
 
   function swapLink() {
@@ -1781,21 +1878,21 @@
     app.analysis = MV.analyze(app.project);
     markDirty();
     refreshAll();
-    toast('连接方向已反转');
+    toast(L('连接方向已反转', 'Link direction reversed'));
   }
 
   function addAbility() {
     const input = document.getElementById('newAbilityName');
     if (!input) return;
     const name = input.value.trim();
-    if (!name) { toast('请输入能力名称', true); return; }
+    if (!name) { toast(L('请输入能力名称', 'Enter an ability name'), true); return; }
     snapshot();
     const id = 'ab_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 4);
     app.project.abilities.push({ id, name });
     app.analysis = MV.analyze(app.project);
     markDirty();
     refreshAll();
-    toast('能力已添加：' + name);
+    toast(L('能力已添加：', 'Ability added: ') + name);
   }
 
   function deleteAbility(id) {
@@ -1804,7 +1901,7 @@
     const usedByLink = app.project.links.some(link => (link.requires || []).includes(id));
     const starting = app.project.startAbilities.includes(id);
     if (usedByItem || usedByLink || starting) {
-      toast('该能力仍被道具 / 门锁 / 起始能力引用，无法删除', true);
+      toast(L('该能力仍被道具 / 门锁 / 起始能力引用，无法删除', 'This ability is still used by items, gates or starting abilities and cannot be deleted'), true);
       return;
     }
     snapshot();
@@ -1812,7 +1909,7 @@
     app.analysis = MV.analyze(app.project);
     markDirty();
     refreshAll();
-    toast('能力已删除');
+    toast(L('能力已删除', 'Ability deleted'));
   }
 
   /* ============================================================
@@ -1837,22 +1934,24 @@
     });
     const kindName = MV.itemKindById(app.itemKind).name;
     const hints = {
-      select: '选择：单击房间，拖动移动，拖角缩放',
-      room: '房间：在空白处拖出房间，自动归入当前区域',
-      connect: '连接：依次点击两个房间创建门锁连接',
-      item: '物品：点击房间放置「' + kindName + '」',
-      pan: '平移：拖动平移画布，滚轮缩放'
+      select: L('选择：单击房间，拖动移动，拖角缩放', 'Select: click a room, drag to move, drag a corner to resize'),
+      room: L('房间：在空白处拖出房间，自动归入当前区域', 'Room: drag on empty space to create a room in the current region'),
+      connect: L('连接：依次点击两个房间创建门锁连接', 'Connect: click two rooms in sequence to create a gate link'),
+      item: L('物品：点击房间放置「', 'Item: click a room to place “') + kindName + L('」', '”'),
+      pan: L('平移：拖动平移画布，滚轮缩放', 'Pan: drag to move the canvas, wheel to zoom')
     };
     els.toolHint.textContent = hints[app.tool] || hints.select;
     if (app.tool === 'connect') {
       const from = app.connectFrom ? MV.findRoom(app.project, app.connectFrom) : null;
       els.connectHint.hidden = false;
-      els.connectHint.textContent = from ? '起点：' + from.name + ' — 点击目标房间（Esc 取消）' : '连接模式：点击第一个房间';
+      els.connectHint.textContent = from
+        ? L('起点：' + from.name + ' — 点击目标房间（Esc 取消）', 'From: ' + from.name + ' — click the target room (Esc to cancel)')
+        : L('连接模式：点击第一个房间', 'Connect mode: click the first room');
     } else {
       els.connectHint.hidden = true;
     }
-    const kindLabel = app.itemKind === 'ability' ? '能力' : app.itemKind === 'key' ? '钥匙' : app.itemKind === 'upgrade' ? '强化' : 'Boss';
-    els.itemKindSeg.title = '当前放置：' + kindLabel;
+    const kindLabel = app.itemKind === 'ability' ? L('能力', 'Ability') : app.itemKind === 'key' ? L('钥匙', 'Key') : app.itemKind === 'upgrade' ? L('强化', 'Upgrade') : 'Boss';
+    els.itemKindSeg.title = L('当前放置：', 'Placing: ') + kindLabel;
     updateCursor();
   }
 
@@ -1876,12 +1975,29 @@
     document.documentElement.dataset.theme = app.theme;
     MV.setCanvasTheme(app.theme);
     if (els.themeBtn) {
-      const label = app.theme === 'light' ? '切换到黑夜模式' : '切换到白天模式';
+      const label = MV.L(
+        app.theme === 'light' ? '切换到黑夜模式' : '切换到白天模式',
+        app.theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'
+      );
       els.themeBtn.title = label;
       els.themeBtn.setAttribute('aria-label', label);
     }
     if (app.view2d && app.view3d) scheduleRender();
     if (persist) persistUI();
+  }
+
+  function applyLanguage(code, persist) {
+    app.lang = code === 'en' ? 'en' : 'zh';
+    MV.setLang(app.lang);
+    MV.applyI18n();
+    app.analysis = MV.analyze(app.project);
+    applyTheme(app.theme, false);
+    updateToolUI();
+    refreshAll();
+    if (persist) {
+      persistUI();
+      toast(MV.L('界面语言：中文', 'Interface language: English'));
+    }
   }
 
   function applyFontScale(scale, persist) {
@@ -1895,7 +2011,7 @@
     if (app.view2d && app.view3d) scheduleRender();
     if (persist) {
       persistUI();
-      toast('字体大小：' + Math.round(value * 100) + '%');
+      toast(L('字体大小：', 'Font size: ') + Math.round(value * 100) + '%');
     }
   }
 
@@ -1931,7 +2047,7 @@
     els.statusMode.textContent = app.mode === '2d' ? '2D ROUTE' : (app.mode === '3d' ? '3D MASSING' : 'LOCK TREE');
     const mainBtn = document.querySelector('[data-tree-main]');
     if (mainBtn) mainBtn.classList.toggle('is-active', app.treeMainOnly);
-    if (app.mode === '2d') els.toolHint.textContent = '选择：单击房间，拖动移动，拖角缩放';
+    if (app.mode === '2d') els.toolHint.textContent = L('选择：单击房间，拖动移动，拖角缩放', 'Select: click a room, drag to move, drag a corner to resize');
     updateCursor();
   }
 
@@ -2016,7 +2132,7 @@
       fit3D();
       app.fitted2d = false;
     }
-    toast('视图已适应全部内容');
+    toast(L('视图已适应全部内容', 'View fitted to all content'));
   }
 
   function focusRoom(roomId) {
@@ -2075,7 +2191,7 @@
 
   function focusRegion(regionId) {
     const rooms = app.project.rooms.filter(room => room.region === regionId);
-    if (!rooms.length) { toast('该区域没有房间', true); return; }
+    if (!rooms.length) { toast(L('该区域没有房间', 'This region has no rooms'), true); return; }
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     rooms.forEach(room => {
       minX = Math.min(minX, room.x);
@@ -2395,7 +2511,7 @@
       const index = app.project.rooms.length + 1;
       const room = {
         id: MV.uid('room'),
-        name: '新房间 ' + index,
+        name: L('新房间 ', 'New Room ') + index,
         region: regionId,
         x: snap(rect.x), y: snap(rect.y),
         w: Math.max(MV.ROOM_MIN_W, snap(rect.w)),
@@ -2411,7 +2527,7 @@
       markDirty();
       updateToolUI();
       refreshAll();
-      toast('房间已创建');
+      toast(L('房间已创建', 'Room created'));
       return;
     }
 
@@ -2459,7 +2575,7 @@
       app.rightTab = 'inspect';
       updateToolUI();
       refreshAll();
-      toast('这两个房间之间已有连接');
+      toast(L('这两个房间之间已有连接', 'A link already exists between these rooms'));
       return;
     }
     snapshot();
@@ -2482,7 +2598,7 @@
     markDirty();
     updateToolUI();
     refreshAll();
-    toast('连接已创建，可在检查器中设置门锁');
+    toast(L('连接已创建，可在检查器中设置门锁', 'Link created. Set its gate in the inspector.'));
   }
 
   /* ============================================================
@@ -2524,14 +2640,14 @@
       const dir = link.dir === 'both' ? '↔' : (link.dir === 'a2b' ? '→' : '←');
       html = `<div class="tt-kicker">LINK / ${gate.code}${open ? ' / OPEN' : ' / LOCKED'}</div>
         <div class="tt-title">${esc(a ? a.name : link.a)} ${dir} ${esc(b ? b.name : link.b)}</div>
-        <div class="tt-meta">${esc(gate.name)}${link.keyReq ? ' · 钥匙 ' + link.keyReq : ''}${reqs.length ? ' · ' + esc(reqs.join(' + ')) : ''}</div>`;
+        <div class="tt-meta">${esc(gate.name)}${link.keyReq ? ' · ' + L('钥匙 ', 'Keys ') + link.keyReq : ''}${reqs.length ? ' · ' + esc(reqs.join(' + ')) : ''}</div>`;
     } else if (hit.type === 'item') {
       const item = MV.findItem(app.project, hit.id);
       if (!item) return hideTooltip();
       const room = MV.findRoom(app.project, item.room);
       html = `<div class="tt-kicker">${MV.itemKindById(item.kind).code}${item.optional ? ' / OPTIONAL' : ''}</div>
         <div class="tt-title">${esc(item.name)}</div>
-        <div class="tt-meta">${esc(room ? room.name : item.room)}${item.grants ? ' · 授予 ' + esc(MV.abilityName(app.project, item.grants)) : ''}</div>`;
+        <div class="tt-meta">${esc(room ? room.name : item.room)}${item.grants ? ' · ' + L('授予 ', 'Grants ') + esc(MV.abilityName(app.project, item.grants)) : ''}</div>`;
     } else {
       return hideTooltip();
     }
@@ -2572,9 +2688,9 @@
       app.lastSaved = ts;
       app.dirty = false;
       updateSaveState();
-      toast('已保存到浏览器本地');
+      toast(L('已保存到浏览器本地', 'Saved to browser storage'));
     } else {
-      toast('保存失败：浏览器存储不可用', true);
+      toast(L('保存失败：浏览器存储不可用', 'Save failed: browser storage is unavailable'), true);
     }
     persistUI();
   }
@@ -2582,7 +2698,7 @@
   function exportJSON() {
     const name = MV.slugify(app.project.meta.title || 'route') + '.routeforge.json';
     MV.download(name, JSON.stringify(app.project, null, 2), 'application/json');
-    toast('已导出 JSON 存档');
+    toast(L('已导出 JSON 存档', 'JSON save exported'));
   }
 
   function importJSON(e) {
@@ -2595,14 +2711,15 @@
         const project = MV.normalizeProject(parsed);
         const counts = MV.projectCounts(project);
         confirmDialog(
-          '导入存档',
-          '将载入「' + project.meta.title + '」：' + counts.regions + ' 个区域 / ' + counts.rooms + ' 个房间。当前项目会先备份到浏览器。',
+          L('导入存档', 'Import Save'),
+          L('将载入「' + project.meta.title + '」：' + counts.regions + ' 个区域 / ' + counts.rooms + ' 个房间。当前项目会先备份到浏览器。',
+            'Load “' + project.meta.title + '”: ' + counts.regions + ' regions / ' + counts.rooms + ' rooms. The current project will be backed up in the browser first.'),
           () => replaceProject(project),
-          '载入存档'
+          L('载入存档', 'Load Save')
         );
       } catch (err) {
         console.error(err);
-        toast('导入失败：不是有效的 Route Forge JSON', true);
+        toast(L('导入失败：不是有效的 Route Forge JSON', 'Import failed: not a valid Route Forge JSON file'), true);
       }
     };
     reader.readAsText(file);
@@ -2613,10 +2730,10 @@
     MV.Render2D.exportPNG(visibleProject(), app.view2d).then(result => {
       const name = MV.slugify(app.project.meta.title || 'route') + '-route.png';
       MV.download(name, result.blob);
-      toast('路线 PNG 已导出');
+      toast(L('路线 PNG 已导出', 'Route PNG exported'));
     }).catch(err => {
       console.error(err);
-      toast('PNG 导出失败', true);
+      toast(L('PNG 导出失败', 'PNG export failed'), true);
     });
   }
 
@@ -2657,7 +2774,7 @@
     }
     refreshAll();
     persistUI();
-    toast('已载入：' + app.project.meta.title);
+    toast(L('已载入：', 'Loaded: ') + app.project.meta.title);
   }
 
   /* ============================================================
@@ -2707,51 +2824,51 @@
   function openPaletteModal() {
     const phaseInputs = app.project.phaseColors.map((color, index) => `
       <label class="color-chip">
-        <input type="color" data-phase-color="${index}" value="${esc(color)}" aria-label="阶段色 ${index + 1}">
+        <input type="color" data-phase-color="${index}" value="${esc(color)}" aria-label="${L('阶段色 ', 'Phase color ')}${index + 1}">
         <span>${String(index + 1).padStart(2, '0')}</span>
       </label>`).join('');
     const regionInputs = app.project.regions.map(region => `
       <div class="region-color-row">
         <span class="region-color-name"><i style="background:${MV.regionColor(region, 'color')}"></i>${esc(region.name)}</span>
-        <input type="color" data-region-color="${esc(region.id)}" value="${esc(region.color)}" aria-label="${esc(region.name)} 颜色">
+        <input type="color" data-region-color="${esc(region.id)}" value="${esc(region.color)}" aria-label="${esc(region.name)} ${L('颜色', 'color')}">
       </div>`).join('');
     const gateLegend = MV.GATE_TYPES.filter(g => g.id !== 'open').map(g => `
       <span class="gate-color-chip"><i style="background:${g.color}"></i>${g.code} ${esc(g.name)}</span>`).join('');
     openModal(`<div class="modal palette-modal">
       <div class="modal-head">
         <div>
-          <div class="modal-kicker">PALETTE / 配色</div>
-          <h2>彩色模式与自定义颜色</h2>
-          <p>颜色不是装饰：区域、阶段、门锁和道具各自有语义。单色模式保留蓝图风格。</p>
+          <div class="modal-kicker">PALETTE / ${L('配色', 'COLOR')}</div>
+          <h2>${L('彩色模式与自定义颜色', 'Color Mode & Custom Palette')}</h2>
+          <p>${L('颜色不是装饰：区域、阶段、门锁和道具各自有语义。单色模式保留蓝图风格。', 'Color is semantic: regions, phases, gates and items each carry different meaning. Monochrome keeps the blueprint look.')}</p>
         </div>
-        <button class="modal-close" data-close aria-label="关闭">×</button>
+        <button class="modal-close" data-close aria-label="${L('关闭', 'Close')}">×</button>
       </div>
       <div class="modal-body">
-        <div class="section-label">显示模式</div>
+        <div class="section-label">${L('显示模式', 'Display Mode')}</div>
         <div class="segmented palette-mode">
-          <button data-color-mode="color" class="${app.colorMode === 'color' ? 'is-active' : ''}">彩色</button>
-          <button data-color-mode="mono" class="${app.colorMode === 'mono' ? 'is-active' : ''}">单色</button>
+          <button data-color-mode="color" class="${app.colorMode === 'color' ? 'is-active' : ''}">${L('彩色', 'Color')}</button>
+          <button data-color-mode="mono" class="${app.colorMode === 'mono' ? 'is-active' : ''}">${L('单色', 'Mono')}</button>
         </div>
-        <p class="hint-line">彩色模式：阶段色带用于房间与 3D 体块，区域色用于边界/顶边/标签，门锁与道具使用各自的语义色。单色模式只使用主题灰度。</p>
+        <p class="hint-line">${L('彩色模式：阶段色带用于房间与 3D 体块，区域色用于边界/顶边/标签，门锁与道具使用各自的语义色。单色模式只使用主题灰度。', 'Color mode: the phase ramp drives rooms and 3D massing, region colors drive borders / top edges / labels, and gates and items use their own semantic colors. Monochrome uses only theme grays.')}</p>
 
-        <div class="section-label">阶段色带</div>
+        <div class="section-label">${L('阶段色带', 'Phase Ramp')}</div>
         <div class="phase-preview" id="phasePreview" style="background:${phasePreviewCss(app.project.phaseColors)}"></div>
         <div class="phase-inputs">${phaseInputs}</div>
         <div class="palette-presets">
-          ${Object.keys(PHASE_PRESETS).map(key => `<button class="palette-preset" data-phase-preset="${key}"><i style="background:${phasePreviewCss(PHASE_PRESETS[key])}"></i><span>${key === 'spectrum' ? '光谱' : key === 'cool' ? '冷色' : key === 'warm' ? '暖色' : key === 'earth' ? '大地' : '霓虹'}</span></button>`).join('')}
+          ${Object.keys(PHASE_PRESETS).map(key => `<button class="palette-preset" data-phase-preset="${key}"><i style="background:${phasePreviewCss(PHASE_PRESETS[key])}"></i><span>${key === 'spectrum' ? L('光谱', 'Spectrum') : key === 'cool' ? L('冷色', 'Cool') : key === 'warm' ? L('暖色', 'Warm') : key === 'earth' ? L('大地', 'Earth') : L('霓虹', 'Neon')}</span></button>`).join('')}
         </div>
 
-        <div class="section-label">区域颜色</div>
+        <div class="section-label">${L('区域颜色', 'Region Colors')}</div>
         <div class="region-color-list">${regionInputs}</div>
 
-        <div class="section-label">门锁颜色</div>
+        <div class="section-label">${L('门锁颜色', 'Gate Colors')}</div>
         <div class="gate-color-legend">${gateLegend}</div>
-        <p class="hint-line">3D 走廊：普通通道使用目标区域色，带门锁的通道使用门锁色；选中房间时，该房间的所有走廊会高亮。</p>
+        <p class="hint-line">${L('3D 走廊：普通通道使用目标区域色，带门锁的通道使用门锁色；选中房间时，该房间的所有走廊会高亮。', '3D corridors: normal passages use the target region color, gated passages use the gate color. Selecting a room highlights all of its corridors.')}</p>
         <div class="btn-row">
-          <button class="btn btn-ghost" data-reset-colors>恢复默认配色</button>
+          <button class="btn btn-ghost" data-reset-colors>${L('恢复默认配色', 'Reset Palette')}</button>
         </div>
       </div>
-      <div class="modal-foot"><button class="btn btn-primary" data-close>完成</button></div>
+      <div class="modal-foot"><button class="btn btn-primary" data-close>${L('完成', 'Done')}</button></div>
     </div>`, {
       onMount(overlay) {
         overlay.querySelectorAll('[data-color-mode]').forEach(btn => {
@@ -2798,7 +2915,7 @@
           renderRegionList();
           markDirty();
           scheduleRender();
-          toast('配色已恢复默认');
+          toast(L('配色已恢复默认', 'Palette reset to defaults'));
         });
       }
     });
@@ -2808,21 +2925,21 @@
     openModal(`<div class="modal jump-modal">
       <div class="modal-head">
         <div>
-          <div class="modal-kicker">JUMP / 快速定位</div>
-          <h2>跳到房间</h2>
-          <p>按房间名、区域、房间类型或备注搜索。</p>
+          <div class="modal-kicker">JUMP / ${L('快速定位', 'QUICK JUMP')}</div>
+          <h2>${L('跳到房间', 'Jump to Room')}</h2>
+          <p>${L('按房间名、区域、房间类型或备注搜索。', 'Search by room name, region, room type or note.')}</p>
         </div>
-        <button class="modal-close" data-close aria-label="关闭">×</button>
+        <button class="modal-close" data-close aria-label="${L('关闭', 'Close')}">×</button>
       </div>
       <div class="modal-body">
         <div class="jump-search">
-          <input id="jumpInput" class="jump-input" placeholder="输入房间名 / 区域代码 / 类型 / 备注…" autocomplete="off" spellcheck="false">
+          <input id="jumpInput" class="jump-input" placeholder="${L('输入房间名 / 区域代码 / 类型 / 备注…', 'Room name / region code / type / note…')}" autocomplete="off" spellcheck="false">
           <span class="jump-count" id="jumpCount"></span>
         </div>
         <div class="jump-list" id="jumpList"></div>
-        <p class="hint-line">↑↓ 选择 · Enter 定位 · Esc 关闭</p>
+        <p class="hint-line">${L('↑↓ 选择 · Enter 定位 · Esc 关闭', '↑↓ select · Enter jump · Esc close')}</p>
       </div>
-      <div class="modal-foot"><button class="btn btn-ghost" data-close>关闭</button></div>
+      <div class="modal-foot"><button class="btn btn-ghost" data-close>${L('关闭', 'Close')}</button></div>
     </div>`, {
       onMount(overlay) {
         const input = overlay.querySelector('#jumpInput');
@@ -2861,7 +2978,7 @@
           active = MV.clamp(active, 0, Math.max(0, results.length - 1));
           count.textContent = results.length + ' / ' + app.project.rooms.length;
           if (!results.length) {
-            list.innerHTML = '<div class="jump-empty">没有匹配的房间</div>';
+            list.innerHTML = `<div class="jump-empty">${L('没有匹配的房间', 'No matching rooms')}</div>`;
             return;
           }
           list.innerHTML = results.map((entry, index) => {
@@ -2926,24 +3043,24 @@
       return `<button class="preset-card ${preset.id === activeId ? 'is-active' : ''}" data-preset-card="${preset.id}">
         <span class="pc-mark"></span>
         <span class="pc-index">${preset.index} / ${preset.subtitle}</span>
-        <span class="pc-name">${preset.name}</span>
-        <span class="pc-desc">${preset.desc}</span>
+        <span class="pc-name">${esc(L(preset.name, preset.nameEn))}</span>
+        <span class="pc-desc">${esc(L(preset.desc, preset.descEn))}</span>
         <span class="pc-meta">${counts ? counts.regions + ' REGIONS · ' + counts.rooms + ' ROOMS · ' + counts.items + ' ITEMS' : ''}</span>
       </button>`;
     }).join('');
     openModal(`<div class="modal">
       <div class="modal-head">
         <div>
-          <div class="modal-kicker">LEVEL PRESETS / 参考路线</div>
-          <h2>载入一个经典结构</h2>
-          <p>预设会替换当前项目，并在浏览器中保留一份上一版备份。建议先导出 JSON。</p>
+          <div class="modal-kicker">LEVEL PRESETS / ${L('参考路线', 'REFERENCE ROUTES')}</div>
+          <h2>${L('载入一个经典结构', 'Load a Classic Structure')}</h2>
+          <p>${L('预设会替换当前项目，并在浏览器中保留一份上一版备份。建议先导出 JSON。', 'Presets replace the current project and keep a backup of the previous version in the browser. Exporting JSON first is recommended.')}</p>
         </div>
-        <button class="modal-close" data-close aria-label="关闭">×</button>
+        <button class="modal-close" data-close aria-label="${L('关闭', 'Close')}">×</button>
       </div>
       <div class="modal-body"><div class="preset-grid">${cards}</div></div>
       <div class="modal-foot">
-        <button class="btn btn-ghost" data-close>取消</button>
-        <button class="btn btn-primary" data-load-preset>载入所选预设</button>
+        <button class="btn btn-ghost" data-close>${L('取消', 'Cancel')}</button>
+        <button class="btn btn-primary" data-load-preset>${L('载入所选预设', 'Load Selected Preset')}</button>
       </div>
     </div>`, {
       onMount(overlay) {
@@ -2959,17 +3076,17 @@
           if (!preset) return;
           closeModal();
           confirmDialog(
-            '载入预设：' + preset.name,
-            '当前项目会先备份到浏览器，然后被这个预设替换。可以继续用撤销 / 导出管理你的版本。',
+            L('载入预设：', 'Load preset: ') + L(preset.name, preset.nameEn),
+            L('当前项目会先备份到浏览器，然后被这个预设替换。可以继续用撤销 / 导出管理你的版本。', 'The current project will be backed up in the browser and then replaced by this preset. You can keep managing versions with undo / export.'),
             () => {
               try {
                 replaceProject(preset.build());
               } catch (err) {
                 console.error(err);
-                toast('预设载入失败', true);
+                toast(L('预设载入失败', 'Failed to load preset'), true);
               }
             },
-            '载入并替换'
+            L('载入并替换', 'Load & Replace')
           );
         });
       }
@@ -2977,6 +3094,58 @@
   }
 
   function openHelpModal() {
+    if (MV.getLang() === 'en') {
+      const rows = [
+        ['V / R / C / I / H', 'Select / Room / Connect / Item / Pan'],
+        ['1 / 2 / 3', '2D Route / 3D Map / Ability Lock Tree'],
+        ['F', 'Focus selection (in the lock tree, switch to 2D and locate)'],
+        ['/ or Ctrl / Cmd + K', 'Quick jump to room'],
+        ['Arrow keys / Shift + Arrow keys', 'Move selected room by 5 / 1 units'],
+        ['Ctrl / Cmd + C / V', 'Copy / paste room (with items, without links)'],
+        ['D or Ctrl / Cmd + D', 'Duplicate room in place'],
+        ['Drag room', 'Move position'],
+        ['Drag corner', 'Resize room'],
+        ['Space + drag / middle button', 'Pan canvas'],
+        ['Wheel', 'Zoom 2D / dolly 3D'],
+        ['Right-drag (3D)', 'Orbit camera'],
+        ['Middle-drag (3D)', 'Pan camera'],
+        ['Shift + drag (3D)', 'Adjust room base elevation'],
+        ['Delete', 'Delete selection'],
+        ['Ctrl / Cmd + Z', 'Undo'],
+        ['Ctrl / Cmd + Shift + Z', 'Redo'],
+        ['Ctrl / Cmd + S', 'Save to browser'],
+        ['Esc', 'Exit input / cancel connection / close modal']
+      ];
+      openModal(`<div class="modal">
+        <div class="modal-head">
+          <div>
+            <div class="modal-kicker">MANUAL / ROUTE FORGE</div>
+            <h2>Controls & Notes</h2>
+            <p>A 2D route + 3D massing designer for 3D Metroidvania games.</p>
+          </div>
+          <button class="modal-close" data-close aria-label="Close">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="shortcut-grid">${rows.map(row => `<div class="shortcut-row"><span>${row[1]}</span><kbd>${row[0]}</kbd></div>`).join('')}</div>
+          <div class="section-label">Appearance & Color</div>
+          <p class="about-copy">The sun / moon button in the top bar switches light and dark themes. The palette button opens color settings where you can switch between color and monochrome, edit the phase ramp segment by segment, and assign a color to each region. In color mode, a room's top edge shows its region, the bottom edge shows its phase, and gates and items use their own semantic colors.</p>
+          <div class="section-label">Region Filter</div>
+          <p class="about-copy">Checkboxes in the left region list control 2D / 3D visibility and can hide several regions at once. The region inspector offers “Show Only This Region,” and “All” above the list restores every region. Filtering affects display only; progression analysis and route validation still use the full project.</p>
+          <div class="section-label">Fast Iteration</div>
+          <p class="about-copy">Press <span class="mono">/</span> or <span class="mono">Ctrl/Cmd + K</span> to open Quick Jump and search by room name, region, type or note. With a room selected, arrow keys move it by 5 units and <span class="mono">Shift + arrows</span> by 1 unit. <span class="mono">Ctrl/Cmd + C / V</span> copies and pastes a room with its items, and <span class="mono">D</span> or <span class="mono">Ctrl/Cmd + D</span> duplicates in place. Turn off “Snap 5px” in the Layers panel for free coordinates.</p>
+          <div class="section-label">Ability Lock Tree</div>
+          <p class="about-copy">The third mode is the ability lock tree. It orders acquisition steps from top to bottom: each row is a phase, with abilities, keys, bosses or optional upgrades above and the gates unlocked in that step below. Every gate card states “← requires / → leads to.” Click a card to inspect the matching item or link; double-click or press F to switch to 2D and locate it.</p>
+          <div class="section-label">Data</div>
+          <p class="about-copy">The project autosaves to browser localStorage, and unsaved changes are flushed when the page is hidden or closed. The save button writes immediately; exporting JSON is the reliable long-term backup. Import backs up the current project to <span class="mono">routeforge.backup.v1</span>. PNG export re-lays out the entire 2D route independently of the current zoom.</p>
+          <div class="section-label">Preset Notes</div>
+          <p class="about-copy">The <strong>Metroid Prime</strong> preset is a <strong>structured reference</strong> assembled from public sources. It keeps the region ring, Magmoor hub, beam-gate matrix, Morph Ball spatial locks, visor locks, environmental gates and the 12-artifact endgame, but does not guarantee official room coordinates or item placements. Other presets are compressed structural references.</p>
+          <div class="section-label">Design Principle</div>
+          <p class="about-copy">First draw “what the player must acquire,” then draw “how those abilities change spatial traversal.” The 2D view owns the causal chain; the 3D view owns massing and vertical relationships. The progress panel uses reachability analysis to check deadlocks, key budgets and unreachable rooms.</p>
+        </div>
+        <div class="modal-foot"><button class="btn btn-primary" data-close>Close</button></div>
+      </div>`);
+      return;
+    }
     const rows = [
       ['V / R / C / I / H', '选择 / 房间 / 连接 / 物品 / 平移'],
       ['1 / 2 / 3', '2D 路线 / 3D 地图 / 能力锁树'],
@@ -3031,13 +3200,13 @@
   function confirmDialog(title, message, onConfirm, confirmLabel) {
     openModal(`<div class="modal is-sm">
       <div class="modal-head">
-        <div><div class="modal-kicker">CONFIRM / 确认</div><h2>${esc(title)}</h2></div>
-        <button class="modal-close" data-close aria-label="关闭">×</button>
+        <div><div class="modal-kicker">CONFIRM / ${L('确认', 'CONFIRM')}</div><h2>${esc(title)}</h2></div>
+        <button class="modal-close" data-close aria-label="${L('关闭', 'Close')}">×</button>
       </div>
       <div class="modal-body"><p class="about-copy">${esc(message)}</p></div>
       <div class="modal-foot">
-        <button class="btn btn-ghost" data-close>取消</button>
-        <button class="btn btn-primary" data-confirm>${esc(confirmLabel || '确认')}</button>
+        <button class="btn btn-ghost" data-close>${L('取消', 'Cancel')}</button>
+        <button class="btn btn-primary" data-confirm>${esc(confirmLabel || L('确认', 'Confirm'))}</button>
       </div>
     </div>`, {
       onMount(overlay) {

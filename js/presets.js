@@ -638,8 +638,10 @@
       id: 'mp1',
       index: '01',
       name: '密特罗德 Prime',
+      nameEn: 'Metroid Prime',
       subtitle: 'TALLON IV / 2002',
       desc: '七个区域、Magmoor 地铁中枢、光束门矩阵、12 神器终局。完整展示 3D 银河城路线设计。',
+      descEn: 'Seven regions, the Magmoor transit hub, a beam-gate matrix and a 12-artifact endgame. A complete 3D Metroidvania route.',
       tags: ['BEAM LOCKS', 'ARTIFACT HUNT', 'HUB TRANSIT'],
       build: metroidPrime
     },
@@ -647,8 +649,10 @@
       id: 'supermetroid',
       index: '02',
       name: '超级密特罗德',
+      nameEn: 'Super Metroid',
       subtitle: 'ZEBES / 1994',
       desc: '四 Boss 封印图里安、能力即钥匙、经典高温与深水门槛。适合对照“能力门”结构。',
+      descEn: 'Four bosses seal Tourian, abilities act as keys, and classic heat and deep-water gates define the map. A good reference for ability-gate structure.',
       tags: ['ABILITY GATES', 'BOSS SEAL', 'CLASSIC'],
       build: superMetroid
     },
@@ -656,8 +660,10 @@
       id: 'hollowknight',
       index: '03',
       name: '空洞骑士',
+      nameEn: 'Hollow Knight',
       subtitle: 'HALLOWNEST / 2017',
       desc: '能力解锁 + 唯一钥匙 + 三守梦人封印，验证工具对非 Metroid Prime 门锁体系的适配。',
+      descEn: 'Ability unlocks, unique keys and the three Dreamers seal. Tests the tool against a non-Metroid Prime gate system.',
       tags: ['UNIQUE KEYS', 'DREAMERS', 'MODERN'],
       build: hollowKnight
     },
@@ -665,8 +671,10 @@
       id: 'blank',
       index: '04',
       name: '空白路线',
+      nameEn: 'Blank Route',
       subtitle: 'CUSTOM / SCRATCH',
       desc: '一间起点房、一套可编辑能力表。从零开始搭建你自己的银河城。',
+      descEn: 'One start room and an editable ability list. Build your own Metroidvania from scratch.',
       tags: ['SCRATCH', 'CUSTOM'],
       build: blankPreset
     }

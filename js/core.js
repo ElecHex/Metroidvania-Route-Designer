@@ -3,6 +3,8 @@
    ============================================================ */
 (function (global) {
   'use strict';
+  const MV = global.MV = global.MV || {};
+  const L = MV.L;
 
   const SCHEMA = 'routeforge/1';
   const STORAGE_KEY = 'routeforge.project.v1';
@@ -20,14 +22,14 @@
   ];
 
   const ROOM_TYPES = [
-    { id: 'normal', name: '普通房间', code: 'ROOM', height: 38, depth: 38, color: '#8f98a8' },
-    { id: 'start', name: '起点 / 着陆', code: 'START', height: 42, depth: 44, color: '#6fcf97' },
-    { id: 'hub', name: '枢纽大厅', code: 'HUB', height: 58, depth: 52, color: '#64b5f6' },
-    { id: 'boss', name: 'Boss 战房', code: 'BOSS', height: 68, depth: 58, color: '#ef5350' },
-    { id: 'save', name: '存档 / 安全屋', code: 'SAVE', height: 30, depth: 32, color: '#4db6ac' },
-    { id: 'transit', name: '升降机 / 换乘', code: 'ELEV', height: 24, depth: 30, color: '#90a4ae' },
-    { id: 'hazard', name: '环境危害区', code: 'HAZARD', height: 40, depth: 40, color: '#ffb74d' },
-    { id: 'goal', name: '终点 / 决战', code: 'GOAL', height: 72, depth: 64, color: '#ffd54f' }
+    { id: 'normal', name: '普通房间', nameEn: 'Normal Room', code: 'ROOM', height: 38, depth: 38, color: '#8f98a8' },
+    { id: 'start', name: '起点 / 着陆', nameEn: 'Start / Landing', code: 'START', height: 42, depth: 44, color: '#6fcf97' },
+    { id: 'hub', name: '枢纽大厅', nameEn: 'Hub Hall', code: 'HUB', height: 58, depth: 52, color: '#64b5f6' },
+    { id: 'boss', name: 'Boss 战房', nameEn: 'Boss Arena', code: 'BOSS', height: 68, depth: 58, color: '#ef5350' },
+    { id: 'save', name: '存档 / 安全屋', nameEn: 'Save / Safe Room', code: 'SAVE', height: 30, depth: 32, color: '#4db6ac' },
+    { id: 'transit', name: '升降机 / 换乘', nameEn: 'Elevator / Transit', code: 'ELEV', height: 24, depth: 30, color: '#90a4ae' },
+    { id: 'hazard', name: '环境危害区', nameEn: 'Hazard Zone', code: 'HAZARD', height: 40, depth: 40, color: '#ffb74d' },
+    { id: 'goal', name: '终点 / 决战', nameEn: 'Final / Goal', code: 'GOAL', height: 72, depth: 64, color: '#ffd54f' }
   ];
 
   const REGION_COLORS = [
@@ -39,36 +41,52 @@
   /* Gate presets are Metroid Prime-flavoured. Any link can override its
      requirements, so the same tool also supports other metroidvanias. */
   const GATE_TYPES = [
-    { id: 'open', name: '无锁通道', code: '--', requires: [], keyReq: 0, style: 'open', color: '#9aa0aa', desc: '普通门或开放通道。' },
-    { id: 'missile', name: '导弹门', code: 'MS', requires: ['missile'], keyReq: 0, style: 'door', color: '#e76f51', desc: '需要导弹发射器。' },
-    { id: 'ice', name: '冰冻门', code: 'IC', requires: ['iceBeam'], keyReq: 0, style: 'door', color: '#6ec6ff', desc: '需要冰冻光束。' },
-    { id: 'wave', name: '波导门', code: 'WV', requires: ['waveBeam'], keyReq: 0, style: 'door', color: '#b388ff', desc: '需要波导光束。' },
-    { id: 'plasma', name: '等离子门', code: 'PL', requires: ['plasmaBeam'], keyReq: 0, style: 'door', color: '#ff5c8a', desc: '需要等离子光束。' },
-    { id: 'morph', name: '变形球通道', code: 'MB', requires: ['morphBall'], keyReq: 0, style: 'morph', color: '#7bd88f', desc: '只有变形球能通过。' },
-    { id: 'bomb', name: '炸弹槽', code: 'BM', requires: ['morphBall', 'bomb'], keyReq: 0, style: 'morph', color: '#f4a261', desc: '需要变形球炸弹触发机关。' },
-    { id: 'boost', name: '加速球半管', code: 'BO', requires: ['morphBall', 'boostBall'], keyReq: 0, style: 'morph', color: '#f6c85f', desc: '需要加速球冲上半管。' },
-    { id: 'spider', name: '蜘蛛球轨道', code: 'SP', requires: ['morphBall', 'spiderBall'], keyReq: 0, style: 'morph', color: '#4dd0c4', desc: '需要蜘蛛球磁轨。' },
-    { id: 'grapple', name: '抓钩点', code: 'GR', requires: ['grappleBeam'], keyReq: 0, style: 'traversal', color: '#9ccc65', desc: '需要抓钩光束跨越。' },
-    { id: 'powerbomb', name: '强力炸弹墙', code: 'PB', requires: ['powerBomb'], keyReq: 0, style: 'door', color: '#ff8c42', desc: '需要强力炸弹破坏。' },
-    { id: 'scan', name: '扫描终端', code: 'SC', requires: ['scanVisor'], keyReq: 0, style: 'tech', color: '#64b5f6', desc: '需要扫描视镜激活。' },
-    { id: 'thermal', name: '热能视镜锁', code: 'TH', requires: ['thermalVisor'], keyReq: 0, style: 'tech', color: '#ff7043', desc: '需要热能视镜看见隐藏结构。' },
-    { id: 'xray', name: 'X 光视镜锁', code: 'XR', requires: ['xRayVisor'], keyReq: 0, style: 'tech', color: '#ba68c8', desc: '需要 X 光视镜识别隐形路径。' },
-    { id: 'heat', name: '高温区', code: 'HT', requires: ['variaSuit'], keyReq: 0, style: 'hazard', color: '#ef5350', desc: '需要瓦利亚服抵抗高温。' },
-    { id: 'water', name: '深水区', code: 'WT', requires: ['gravitySuit'], keyReq: 0, style: 'hazard', color: '#42a5f5', desc: '需要重力服在水中行动。' },
-    { id: 'phazon', name: 'Phazon 污染', code: 'PH', requires: ['phazonSuit'], keyReq: 0, style: 'hazard', color: '#aeea00', desc: '需要 Phazon 服才能通过。' },
-    { id: 'artifact', name: '钥匙 / 神器封印', code: 'KY', requires: [], keyReq: 1, style: 'seal', color: '#ffd54f', desc: '消耗或要求若干钥匙 / 神器。' },
-    { id: 'ability', name: '自定义能力锁', code: 'AB', requires: [], keyReq: 0, style: 'custom', color: '#c7a6ff', desc: '在检查器中勾选任意能力需求。' },
-    { id: 'hazard', name: '自定义环境锁', code: 'HZ', requires: [], keyReq: 0, style: 'hazard', color: '#ffb74d', desc: '自定义环境或状态门槛。' },
-    { id: 'boss', name: 'Boss 守门', code: 'BS', requires: [], keyReq: 0, style: 'custom', color: '#ef5350', desc: 'Boss 战后开放；需求可自定义。' },
-    { id: 'elevator', name: '区域升降机', code: 'EL', requires: [], keyReq: 0, style: 'transit', color: '#90a4ae', desc: '区域间换乘，通常无门槛。' }
+    { id: 'open', name: '无锁通道', nameEn: 'Open Passage', code: '--', requires: [], keyReq: 0, style: 'open', color: '#9aa0aa', desc: '普通门或开放通道。', descEn: 'Regular door or open passage.' },
+    { id: 'missile', name: '导弹门', nameEn: 'Missile Door', code: 'MS', requires: ['missile'], keyReq: 0, style: 'door', color: '#e76f51', desc: '需要导弹发射器。', descEn: 'Requires the Missile Launcher.' },
+    { id: 'ice', name: '冰冻门', nameEn: 'Ice Door', code: 'IC', requires: ['iceBeam'], keyReq: 0, style: 'door', color: '#6ec6ff', desc: '需要冰冻光束。', descEn: 'Requires the Ice Beam.' },
+    { id: 'wave', name: '波导门', nameEn: 'Wave Door', code: 'WV', requires: ['waveBeam'], keyReq: 0, style: 'door', color: '#b388ff', desc: '需要波导光束。', descEn: 'Requires the Wave Beam.' },
+    { id: 'plasma', name: '等离子门', nameEn: 'Plasma Door', code: 'PL', requires: ['plasmaBeam'], keyReq: 0, style: 'door', color: '#ff5c8a', desc: '需要等离子光束。', descEn: 'Requires the Plasma Beam.' },
+    { id: 'morph', name: '变形球通道', nameEn: 'Morph Ball Tunnel', code: 'MB', requires: ['morphBall'], keyReq: 0, style: 'morph', color: '#7bd88f', desc: '只有变形球能通过。', descEn: 'Only the Morph Ball can pass.' },
+    { id: 'bomb', name: '炸弹槽', nameEn: 'Bomb Slot', code: 'BM', requires: ['morphBall', 'bomb'], keyReq: 0, style: 'morph', color: '#f4a261', desc: '需要变形球炸弹触发机关。', descEn: 'Requires Morph Ball Bombs.' },
+    { id: 'boost', name: '加速球半管', nameEn: 'Boost Ball Half-pipe', code: 'BO', requires: ['morphBall', 'boostBall'], keyReq: 0, style: 'morph', color: '#f6c85f', desc: '需要加速球冲上半管。', descEn: 'Requires the Boost Ball.' },
+    { id: 'spider', name: '蜘蛛球轨道', nameEn: 'Spider Ball Track', code: 'SP', requires: ['morphBall', 'spiderBall'], keyReq: 0, style: 'morph', color: '#4dd0c4', desc: '需要蜘蛛球磁轨。', descEn: 'Requires the Spider Ball.' },
+    { id: 'grapple', name: '抓钩点', nameEn: 'Grapple Point', code: 'GR', requires: ['grappleBeam'], keyReq: 0, style: 'traversal', color: '#9ccc65', desc: '需要抓钩光束跨越。', descEn: 'Requires the Grapple Beam.' },
+    { id: 'powerbomb', name: '强力炸弹墙', nameEn: 'Power Bomb Wall', code: 'PB', requires: ['powerBomb'], keyReq: 0, style: 'door', color: '#ff8c42', desc: '需要强力炸弹破坏。', descEn: 'Requires Power Bombs.' },
+    { id: 'scan', name: '扫描终端', nameEn: 'Scan Terminal', code: 'SC', requires: ['scanVisor'], keyReq: 0, style: 'tech', color: '#64b5f6', desc: '需要扫描视镜激活。', descEn: 'Requires the Scan Visor.' },
+    { id: 'thermal', name: '热能视镜锁', nameEn: 'Thermal Visor Lock', code: 'TH', requires: ['thermalVisor'], keyReq: 0, style: 'tech', color: '#ff7043', desc: '需要热能视镜看见隐藏结构。', descEn: 'Requires the Thermal Visor.' },
+    { id: 'xray', name: 'X 光视镜锁', nameEn: 'X-Ray Visor Lock', code: 'XR', requires: ['xRayVisor'], keyReq: 0, style: 'tech', color: '#ba68c8', desc: '需要 X 光视镜识别隐形路径。', descEn: 'Requires the X-Ray Visor.' },
+    { id: 'heat', name: '高温区', nameEn: 'High Heat Zone', code: 'HT', requires: ['variaSuit'], keyReq: 0, style: 'hazard', color: '#ef5350', desc: '需要瓦利亚服抵抗高温。', descEn: 'Requires the Varia Suit.' },
+    { id: 'water', name: '深水区', nameEn: 'Deep Water Zone', code: 'WT', requires: ['gravitySuit'], keyReq: 0, style: 'hazard', color: '#42a5f5', desc: '需要重力服在水中行动。', descEn: 'Requires the Gravity Suit.' },
+    { id: 'phazon', name: 'Phazon 污染', nameEn: 'Phazon Hazard', code: 'PH', requires: ['phazonSuit'], keyReq: 0, style: 'hazard', color: '#aeea00', desc: '需要 Phazon 服才能通过。', descEn: 'Requires the Phazon Suit.' },
+    { id: 'artifact', name: '钥匙 / 神器封印', nameEn: 'Key / Artifact Seal', code: 'KY', requires: [], keyReq: 1, style: 'seal', color: '#ffd54f', desc: '消耗或要求若干钥匙 / 神器。', descEn: 'Requires one or more keys / artifacts.' },
+    { id: 'ability', name: '自定义能力锁', nameEn: 'Custom Ability Lock', code: 'AB', requires: [], keyReq: 0, style: 'custom', color: '#c7a6ff', desc: '在检查器中勾选任意能力需求。', descEn: 'Tick any ability requirements in the inspector.' },
+    { id: 'hazard', name: '自定义环境锁', nameEn: 'Custom Hazard Lock', code: 'HZ', requires: [], keyReq: 0, style: 'hazard', color: '#ffb74d', desc: '自定义环境或状态门槛。', descEn: 'Custom environment or state gate.' },
+    { id: 'boss', name: 'Boss 守门', nameEn: 'Boss Gate', code: 'BS', requires: [], keyReq: 0, style: 'custom', color: '#ef5350', desc: 'Boss 战后开放；需求可自定义。', descEn: 'Opens after a boss fight; requirements are editable.' },
+    { id: 'elevator', name: '区域升降机', nameEn: 'Regional Elevator', code: 'EL', requires: [], keyReq: 0, style: 'transit', color: '#90a4ae', desc: '区域间换乘，通常无门槛。', descEn: 'Travel between regions, usually unlocked.' }
   ];
 
   const ITEM_KINDS = [
-    { id: 'ability', name: '能力道具', code: 'ABILITY', short: 'AB', color: '#64b5f6' },
-    { id: 'key', name: '钥匙 / 神器', code: 'KEY', short: 'KY', color: '#ffd54f' },
-    { id: 'upgrade', name: '可选强化', code: 'UPGRADE', short: 'UP', color: '#4db6ac' },
-    { id: 'boss', name: 'Boss / 事件', code: 'BOSS', short: 'BS', color: '#ef5350' }
+    { id: 'ability', name: '能力道具', nameEn: 'Ability Item', code: 'ABILITY', short: 'AB', color: '#64b5f6' },
+    { id: 'key', name: '钥匙 / 神器', nameEn: 'Key / Artifact', code: 'KEY', short: 'KY', color: '#ffd54f' },
+    { id: 'upgrade', name: '可选强化', nameEn: 'Optional Upgrade', code: 'UPGRADE', short: 'UP', color: '#4db6ac' },
+    { id: 'boss', name: 'Boss / 事件', nameEn: 'Boss / Event', code: 'BOSS', short: 'BS', color: '#ef5350' }
   ];
+
+  function localizeCatalogEntry(entry, property, enProperty) {
+    const zh = entry[property];
+    const en = entry[enProperty];
+    Object.defineProperty(entry, property, {
+      configurable: true,
+      enumerable: true,
+      get: function () { return MV.L(zh, en); }
+    });
+  }
+  ROOM_TYPES.forEach(entry => localizeCatalogEntry(entry, 'name', 'nameEn'));
+  GATE_TYPES.forEach(entry => {
+    localizeCatalogEntry(entry, 'name', 'nameEn');
+    localizeCatalogEntry(entry, 'desc', 'descEn');
+  });
+  ITEM_KINDS.forEach(entry => localizeCatalogEntry(entry, 'name', 'nameEn'));
 
   const DOUBLE_LINK = 'both';
   const ROOM_MIN_W = 56;
@@ -432,7 +450,10 @@
 
   function abilityName(project, id) {
     const ability = (project.abilities || []).find(a => a.id === id);
-    return ability ? ability.name : id;
+    if (!ability) return id;
+    const base = BASE_ABILITY_DEFS.find(a => a.id === id);
+    if (base && MV.getLang() === 'en' && ability.name === base.zh) return base.en;
+    return ability.name;
   }
 
   function findRoom(project, id) {
@@ -464,27 +485,32 @@
   }
 
   /* ---------------- default project ---------------- */
+  const BASE_ABILITY_DEFS = [
+    { id: 'scanVisor', zh: '扫描视镜', en: 'Scan Visor' },
+    { id: 'morphBall', zh: '变形球', en: 'Morph Ball' },
+    { id: 'bomb', zh: '变形球炸弹', en: 'Morph Ball Bomb' },
+    { id: 'missile', zh: '导弹发射器', en: 'Missile Launcher' },
+    { id: 'chargeBeam', zh: '蓄力光束', en: 'Charge Beam' },
+    { id: 'boostBall', zh: '加速球', en: 'Boost Ball' },
+    { id: 'spiderBall', zh: '蜘蛛球', en: 'Spider Ball' },
+    { id: 'spaceJump', zh: '太空跳跃', en: 'Space Jump' },
+    { id: 'variaSuit', zh: '瓦利亚服', en: 'Varia Suit' },
+    { id: 'waveBeam', zh: '波导光束', en: 'Wave Beam' },
+    { id: 'iceBeam', zh: '冰冻光束', en: 'Ice Beam' },
+    { id: 'plasmaBeam', zh: '等离子光束', en: 'Plasma Beam' },
+    { id: 'gravitySuit', zh: '重力服', en: 'Gravity Suit' },
+    { id: 'thermalVisor', zh: '热能视镜', en: 'Thermal Visor' },
+    { id: 'xRayVisor', zh: 'X 光视镜', en: 'X-Ray Visor' },
+    { id: 'grappleBeam', zh: '抓钩光束', en: 'Grapple Beam' },
+    { id: 'powerBomb', zh: '强力炸弹', en: 'Power Bomb' },
+    { id: 'phazonSuit', zh: 'Phazon 服', en: 'Phazon Suit' }
+  ];
+
   function baseAbilities() {
-    return [
-      { id: 'scanVisor', name: '扫描视镜' },
-      { id: 'morphBall', name: '变形球' },
-      { id: 'bomb', name: '变形球炸弹' },
-      { id: 'missile', name: '导弹发射器' },
-      { id: 'chargeBeam', name: '蓄力光束' },
-      { id: 'boostBall', name: '加速球' },
-      { id: 'spiderBall', name: '蜘蛛球' },
-      { id: 'spaceJump', name: '太空跳跃' },
-      { id: 'variaSuit', name: '瓦利亚服' },
-      { id: 'waveBeam', name: '波导光束' },
-      { id: 'iceBeam', name: '冰冻光束' },
-      { id: 'plasmaBeam', name: '等离子光束' },
-      { id: 'gravitySuit', name: '重力服' },
-      { id: 'thermalVisor', name: '热能视镜' },
-      { id: 'xRayVisor', name: 'X 光视镜' },
-      { id: 'grappleBeam', name: '抓钩光束' },
-      { id: 'powerBomb', name: '强力炸弹' },
-      { id: 'phazonSuit', name: 'Phazon 服' }
-    ];
+    return BASE_ABILITY_DEFS.map(ability => ({
+      id: ability.id,
+      name: L(ability.zh, ability.en)
+    }));
   }
 
   function createBlankProject() {
@@ -493,9 +519,9 @@
     return normalizeProject({
       schema: SCHEMA,
       meta: {
-        title: '空白路线',
+        title: L('空白路线', 'Blank Route'),
         preset: 'blank',
-        notes: '从一间房开始，逐步加入区域、门锁、能力与 Boss。',
+        notes: L('从一间房开始，逐步加入区域、门锁、能力与 Boss。', 'Start with one room and add regions, gates, abilities and bosses step by step.'),
         created: Date.now(),
         updated: Date.now()
       },
@@ -503,9 +529,9 @@
       startAbilities: [],
       startRoom: roomId,
       goalRoom: roomId,
-      regions: [{ id: regionId, name: '新区域', code: 'ZONE', tone: 1, elev: 0 }],
+      regions: [{ id: regionId, name: L('新区域', 'New Region'), code: 'ZONE', tone: 1, elev: 0 }],
       rooms: [{
-        id: roomId, name: '起点房间', region: regionId,
+        id: roomId, name: L('起点房间', 'Start Room'), region: regionId,
         x: 0, y: 0, w: 180, h: 100, type: 'start',
         height: 44, elev: 0, depth: 46, note: ''
       }],
@@ -520,7 +546,7 @@
     const project = clone(input);
     project.schema = SCHEMA;
     project.meta = project.meta && typeof project.meta === 'object' ? project.meta : {};
-    project.meta.title = project.meta.title || '未命名路线';
+    project.meta.title = project.meta.title || L('未命名路线', 'Untitled Route');
     project.meta.preset = project.meta.preset || 'custom';
     project.meta.notes = project.meta.notes || '';
     project.meta.updated = project.meta.updated || Date.now();
@@ -546,7 +572,7 @@
         const tone = clamp(Number(r.tone) || 0, 0, REGION_TONES.length - 1);
         return {
           id: String(r.id),
-          name: String(r.name || '未命名区域'),
+          name: String(r.name || L('未命名区域', 'Untitled Region')),
           code: String(r.code || 'ZONE').toUpperCase().slice(0, 6),
           tone: tone,
           elev: clamp(Number(r.elev) || 0, -500, 500),
@@ -555,7 +581,7 @@
       });
     if (!project.regions.length) {
       project.regions = [{
-        id: 'region_1', name: '新区域', code: 'ZONE', tone: 1, elev: 0,
+        id: 'region_1', name: L('新区域', 'New Region'), code: 'ZONE', tone: 1, elev: 0,
         color: REGION_COLORS[1]
       }];
     }
@@ -568,7 +594,7 @@
         const type = roomTypeById(r.type);
         return {
           id: String(r.id),
-          name: String(r.name || '未命名房间'),
+          name: String(r.name || L('未命名房间', 'Untitled Room')),
           region: regionIds.has(String(r.region)) ? String(r.region) : project.regions[0].id,
           x: Number.isFinite(Number(r.x)) ? Number(r.x) : 0,
           y: Number.isFinite(Number(r.y)) ? Number(r.y) : 0,
@@ -583,7 +609,7 @@
       });
     if (!project.rooms.length) {
       project.rooms = [{
-        id: 'room_1', name: '起点房间', region: project.regions[0].id,
+        id: 'room_1', name: L('起点房间', 'Start Room'), region: project.regions[0].id,
         x: 0, y: 0, w: 180, h: 100, type: 'start', height: 44, elev: 0, depth: 46, note: ''
       }];
     }
@@ -617,7 +643,7 @@
         const kind = itemKindById(i.kind);
         return {
           id: String(i.id),
-          name: String(i.name || '未命名物品'),
+          name: String(i.name || L('未命名物品', 'Untitled Item')),
           kind: kind.id,
           room: String(i.room),
           grants: i.grants && project.abilities.some(a => a.id === i.grants) ? String(i.grants) : '',
