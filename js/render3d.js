@@ -254,27 +254,170 @@
     });
   }
 
-  function corridorAnchors(a, b) {
-    const dx = b.cx - a.cx;
-    const dz = b.cz - a.cz;
-    let ax, az, bx, bz;
-    if (Math.abs(dx) >= Math.abs(dz)) {
-      const sx = dx === 0 ? 1 : Math.sign(dx);
-      ax = a.cx + sx * (a.width / 2 + 0.04);
-      bx = b.cx - sx * (b.width / 2 + 0.04);
-      az = clamp(b.cz, a.minZ + 0.24, a.maxZ - 0.24);
-      bz = clamp(a.cz, b.minZ + 0.24, b.maxZ - 0.24);
+  const FACE_NORMALS = {
+    E: { x: 1, z: 0 },
+    W: { x: -1, z: 0 },
+    N: { x: 0, z: -1 },
+    S: { x: 0, z: 1 }
+  };
+
+  function corridorSide(from, to) {
+    const dx = to.cx - from.cx;
+    const dz = to.cz - from.cz;
+    if (Math.abs(dx) >= Math.abs(dz)) return dx >= 0 ? 'E' : 'W';
+    return dz >= 0 ? 'S' : 'N';
+  }
+
+  /* Assign a distinct port on each room face for every link. Links leaving the
+     same face are spread along that face and get progressively thinner, so they
+     no longer collapse into one shared opening. */
+  function buildCorridorRoutes(project, boxes) {
+    const groups = new Map();
+    function addExit(linkId, end, room, other) {
+      const side = corridorSide(room, other);
+      const horizontal = side === 'E' || side === 'W';
+      const key = room.id + '|' + side;
+      if (!groups.has(key)) groups.set(key, { room, side, exits: [] });
+      groups.get(key).exits.push({
+        linkId, end,
+        target: horizontal ? other.cz : other.cx
+      });
+    }
+    (project.links || []).forEach(link => {
+      const a = boxes[link.a];
+      const b = boxes[link.b];
+      if (!a || !b) return;
+      addExit(link.id, 'a', a, b);
+      addExit(link.id, 'b', b, a);
+    });
+
+    const ports = {};
+    groups.forEach(group => {
+      const room = group.room;
+      const side = group.side;
+      const horizontal = side === 'E' || side === 'W';
+      const exits = group.exits.sort((p, q) => p.target - q.target || p.linkId.localeCompare(q.linkId));
+      const min = horizontal ? room.minZ : room.minX;
+      const max = horizontal ? room.maxZ : room.maxX;
+      const face = Math.max(0.08, max - min);
+      const margin = Math.min(0.2, face * 0.09);
+      const innerMin = min + margin;
+      const innerMax = max - margin;
+      const count = exits.length;
+      const spacing = count > 1 ? (innerMax - innerMin) / (count + 1) : 0.6;
+      const width = clamp(spacing * 0.82, 0.17, 0.46);
+      exits.forEach((exit, index) => {
+        const coord = count === 1
+          ? clamp(exit.target, innerMin, innerMax)
+          : innerMin + (innerMax - innerMin) * ((index + 1) / (count + 1));
+        const gap = 0.035;
+        let x;
+        let z;
+        if (side === 'E') { x = room.maxX + gap; z = coord; }
+        else if (side === 'W') { x = room.minX - gap; z = coord; }
+        else if (side === 'S') { z = room.maxZ + gap; x = coord; }
+        else { z = room.minZ - gap; x = coord; }
+        if (!ports[exit.linkId]) ports[exit.linkId] = {};
+        ports[exit.linkId][exit.end] = {
+          x, z,
+          y: room.base + room.height * 0.42,
+          side,
+          width,
+          index,
+          count
+        };
+      });
+    });
+
+    const routes = {};
+    (project.links || []).forEach(link => {
+      const port = ports[link.id];
+      if (!port || !port.a || !port.b) return;
+      routes[link.id] = buildRoute(port.a, port.b);
+    });
+    return routes;
+  }
+
+  function buildRoute(portA, portB) {
+    const normalA = FACE_NORMALS[portA.side];
+    const normalB = FACE_NORMALS[portB.side];
+    const lead = 0.32;
+    const start = { x: portA.x, z: portA.z };
+    const stubA = { x: portA.x + normalA.x * lead, z: portA.z + normalA.z * lead };
+    const stubB = { x: portB.x + normalB.x * lead, z: portB.z + normalB.z * lead };
+    const horizontal = portA.side === 'E' || portA.side === 'W';
+    const laneGroup = portA.count >= portB.count ? portA : portB;
+    const laneT = laneGroup.count > 1
+      ? (laneGroup.index + 1) / (laneGroup.count + 1)
+      : 0.5;
+    let elbow1;
+    let elbow2;
+    if (horizontal) {
+      const laneX = stubA.x + (stubB.x - stubA.x) * laneT;
+      elbow1 = { x: laneX, z: stubA.z };
+      elbow2 = { x: laneX, z: stubB.z };
     } else {
-      const sz = dz === 0 ? 1 : Math.sign(dz);
-      az = a.cz + sz * (a.depth / 2 + 0.04);
-      bz = b.cz - sz * (b.depth / 2 + 0.04);
-      ax = clamp(b.cx, a.minX + 0.24, a.maxX - 0.24);
-      bx = clamp(a.cx, b.minX + 0.24, b.maxX - 0.24);
+      const laneZ = stubA.z + (stubB.z - stubA.z) * laneT;
+      elbow1 = { x: stubA.x, z: laneZ };
+      elbow2 = { x: stubB.x, z: laneZ };
+    }
+    const points = [start, stubA, elbow1, elbow2, stubB, { x: portB.x, z: portB.z }];
+    const cleaned = [];
+    points.forEach(point => {
+      const last = cleaned[cleaned.length - 1];
+      if (!last || Math.hypot(point.x - last.x, point.z - last.z) > 0.01) cleaned.push(point);
+    });
+    let gateDirX;
+    let gateDirZ;
+    if (Math.hypot(elbow2.x - elbow1.x, elbow2.z - elbow1.z) > 0.02) {
+      gateDirX = elbow2.x - elbow1.x;
+      gateDirZ = elbow2.z - elbow1.z;
+    } else if (horizontal) {
+      gateDirX = 1;
+      gateDirZ = 0;
+    } else {
+      gateDirX = 0;
+      gateDirZ = 1;
     }
     return {
-      a: { x: ax, z: az, y: a.base + a.height * 0.42 },
-      b: { x: bx, z: bz, y: b.base + b.height * 0.42 }
+      points: cleaned,
+      gate: {
+        x: (elbow1.x + elbow2.x) / 2,
+        z: (elbow1.z + elbow2.z) / 2,
+        /* The gate is a crossbar: long axis x when the local corridor runs z. */
+        alongX: Math.abs(gateDirZ) > Math.abs(gateDirX)
+      },
+      width: Math.min(portA.width, portB.width),
+      yA: portA.y,
+      yB: portB.y
     };
+  }
+
+  function splitPathAtHalf(points) {
+    if (!points || points.length < 2) return null;
+    let total = 0;
+    for (let i = 1; i < points.length; i++) {
+      total += Math.hypot(points[i].x - points[i - 1].x, points[i].z - points[i - 1].z);
+    }
+    let remaining = total / 2;
+    for (let i = 1; i < points.length; i++) {
+      const p0 = points[i - 1];
+      const p1 = points[i];
+      const length = Math.hypot(p1.x - p0.x, p1.z - p0.z);
+      if (remaining <= length || i === points.length - 1) {
+        const t = length > 0.001 ? remaining / length : 0;
+        const shaft = { x: p0.x + (p1.x - p0.x) * t, z: p0.z + (p1.z - p0.z) * t };
+        return {
+          before: points.slice(0, i).concat([shaft]),
+          after: [shaft].concat(points.slice(i)),
+          shaft,
+          dx: p1.x - p0.x,
+          dz: p1.z - p0.z
+        };
+      }
+      remaining -= length;
+    }
+    return null;
   }
 
   function buildCorridors(project, view, sc) {
@@ -285,11 +428,14 @@
     sc.boxes.forEach(box => { boxes[box.id] = box; });
     const pathSet = new Set((view.analysis && view.analysis.pathLinks) || []);
     const selectedRoom = view.selection && view.selection.type === 'room' ? view.selection.id : null;
+    const routes = buildCorridorRoutes(project, boxes);
 
     (project.links || []).forEach(link => {
       const a = boxes[link.a];
       const b = boxes[link.b];
       if (!a || !b) return;
+      const route = routes[link.id];
+      if (!route || route.points.length < 2) return;
       const gate = MV.gateById(link.gate);
       const gateAccent = MV.gateColor(gate, view.colorMode);
       const targetRegion = project.regions.find(r => r.id === b.room.region);
@@ -304,7 +450,6 @@
       const open = view.analysis && view.analysis.openLinks
         ? view.analysis.openLinks[link.id] !== undefined
         : true;
-      const anchors = corridorAnchors(a, b);
       let topFill;
       let sideFill;
       let stroke;
@@ -329,7 +474,7 @@
       const doorStyle = { fill: sideFill, topFill, stroke, width: selected ? 1 : 0.6, selected, corridor: true };
 
       const threshold = (point) => {
-        const size = 0.16;
+        const size = clamp(route.width * 0.55, 0.08, 0.16);
         addGenericBox(faces, sc, {
           minX: point.x - size, maxX: point.x + size,
           minZ: point.z - size, maxZ: point.z + size,
@@ -342,35 +487,75 @@
         oneWay: link.dir !== 'both', direction: link.dir
       });
 
-      const dy = Math.abs(anchors.a.y - anchors.b.y);
-      if (dy < 0.24) {
-        addOrientedPrism(faces, sc, anchors.a.x, anchors.a.z, anchors.b.x, anchors.b.z,
-          (anchors.a.y + anchors.b.y) / 2, 0.46, 0.36, prismStyle);
-      } else {
-        const mx = (anchors.a.x + anchors.b.x) / 2;
-        const mz = (anchors.a.z + anchors.b.z) / 2;
-        addOrientedPrism(faces, sc, anchors.a.x, anchors.a.z, mx, mz, anchors.a.y, 0.46, 0.34, prismStyle);
-        addOrientedPrism(faces, sc, mx, mz, anchors.b.x, anchors.b.z, anchors.b.y, 0.46, 0.34, prismStyle);
+      const corridorWidth = route.width;
+      const first = route.points[0];
+      const last = route.points[route.points.length - 1];
+
+      const addSegment = (p0, p1, y, height) => {
+        if (Math.hypot(p1.x - p0.x, p1.z - p0.z) < 0.012) return;
+        addOrientedPrism(faces, sc, p0.x, p0.z, p1.x, p1.z, y, corridorWidth, height || 0.36, prismStyle);
+      };
+      const addJoint = (point, y) => {
+        const half = Math.max(0.09, corridorWidth * 0.52);
         addGenericBox(faces, sc, {
-          minX: mx - 0.14, maxX: mx + 0.14,
-          minZ: mz - 0.14, maxZ: mz + 0.14,
-          base: Math.min(anchors.a.y, anchors.b.y) - 0.12,
-          top: Math.max(anchors.a.y, anchors.b.y) + 0.12
+          minX: point.x - half, maxX: point.x + half,
+          minZ: point.z - half, maxZ: point.z + half,
+          base: y - 0.18, top: y + 0.18
+        }, { fill: sideFill, topFill, stroke, width: selected || isPath ? 0.9 : 0.6, selected, corridor: true });
+      };
+      const addGate = (point, alongX, y) => {
+        const halfAlong = 0.24;
+        const halfAcross = 0.08;
+        addGenericBox(faces, sc, {
+          minX: point.x - (alongX ? halfAlong : halfAcross),
+          maxX: point.x + (alongX ? halfAlong : halfAcross),
+          minZ: point.z - (alongX ? halfAcross : halfAlong),
+          maxZ: point.z + (alongX ? halfAcross : halfAlong),
+          base: y - 0.26, top: y + 0.28
+        }, { fill: topFill, topFill: stroke, stroke, width: selected || isPath ? 1.2 : 0.8, selected, corridor: true });
+      };
+
+      const dy = Math.abs(route.yA - route.yB);
+      if (dy < 0.24) {
+        const y = (route.yA + route.yB) / 2;
+        for (let i = 1; i < route.points.length; i++) {
+          addSegment(route.points[i - 1], route.points[i], y);
+        }
+        for (let i = 1; i < route.points.length - 1; i++) {
+          addJoint(route.points[i], y);
+        }
+        addGate(route.gate, route.gate.alongX, y);
+        labelPoint(route.gate.x, y + 0.46, route.gate.z);
+      } else {
+        const split = splitPathAtHalf(route.points);
+        if (!split) return;
+        for (let i = 1; i < split.before.length; i++) {
+          addSegment(split.before[i - 1], split.before[i], route.yA, 0.34);
+        }
+        for (let i = 1; i < split.before.length - 1; i++) {
+          addJoint(split.before[i], route.yA);
+        }
+        for (let i = 1; i < split.after.length; i++) {
+          addSegment(split.after[i - 1], split.after[i], route.yB, 0.34);
+        }
+        for (let i = 1; i < split.after.length - 1; i++) {
+          addJoint(split.after[i], route.yB);
+        }
+        const half = Math.max(0.11, corridorWidth * 0.55);
+        addGenericBox(faces, sc, {
+          minX: split.shaft.x - half, maxX: split.shaft.x + half,
+          minZ: split.shaft.z - half, maxZ: split.shaft.z + half,
+          base: Math.min(route.yA, route.yB) - 0.12,
+          top: Math.max(route.yA, route.yB) + 0.12
         }, { fill: sideFill, topFill, stroke, width: selected || isPath ? 1 : 0.6, selected, corridor: true });
+        const gateY = (route.yA + route.yB) / 2;
+        const alongX = Math.abs(split.dz) > Math.abs(split.dx);
+        addGate(split.shaft, alongX, gateY);
+        labelPoint(split.shaft.x, gateY + 0.46, split.shaft.z);
       }
 
-      threshold(anchors.a);
-      threshold(anchors.b);
-      const gateY = (anchors.a.y + anchors.b.y) / 2;
-      const gateX = (anchors.a.x + anchors.b.x) / 2;
-      const gateZ = (anchors.a.z + anchors.b.z) / 2;
-      addGenericBox(faces, sc, {
-        minX: gateX - 0.22, maxX: gateX + 0.22,
-        minZ: gateZ - 0.07, maxZ: gateZ + 0.07,
-        base: gateY - 0.26, top: gateY + 0.28
-      }, { fill: topFill, topFill: stroke, stroke, width: selected || isPath ? 1.2 : 0.8, selected, corridor: true });
-
-      labelPoint(gateX, gateY + 0.46, gateZ);
+      threshold({ x: first.x, z: first.z, y: route.yA });
+      threshold({ x: last.x, z: last.z, y: route.yB });
     });
 
     return { faces, labels };

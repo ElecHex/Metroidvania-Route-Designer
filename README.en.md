@@ -48,6 +48,8 @@ Internal codename: **ROUTE FORGE**. Pure frontend, zero dependencies: open `inde
   - Same-floor links generate solid corridor prisms
   - Cross-floor links generate a horizontal run plus a vertical shaft (elevator)
   - Both ends get door frames / threshold blocks; the middle gets a gate barrier
+- Multiple corridors leaving the same room face get distinct wall ports and staggered orthogonal bends instead of collapsing into one shared opening
+- Gate blocks cross the local corridor direction; corridors and thresholds get thinner when a face is crowded
 - Type-specific room details: roof panels, boss pedestal, save / start / goal beacons
 - Normal corridors use the target region color; locked corridors use the gate color; selecting a room highlights all its corridors
 - Camera: left-drag rooms, right-drag orbit, middle-drag pan, wheel dolly, ISO / TOP / FRONT presets
