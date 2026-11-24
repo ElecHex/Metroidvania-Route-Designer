@@ -133,7 +133,6 @@
       <section class="panel-block">
         <div class="panel-heading">
           <span data-i18n data-zh="图层" data-en="Layers">图层</span>
-          <button id="langBtn" class="mini-text-btn" data-i18n data-zh="EN" data-en="中文" data-zh-title="切换到英文界面" data-en-title="Switch to Chinese" title="切换到英文界面">EN</button>
         </div>
         <div class="layer-list" id="layerList">
           <label><input type="checkbox" data-layer="gates" checked><span data-i18n data-zh="门锁标记" data-en="Gates">门锁标记</span></label>
@@ -149,7 +148,13 @@
           <span data-i18n data-zh="网格吸附 5px" data-en="Snap 5px">网格吸附 5px</span>
         </label>
         <div class="font-size-block">
-          <div class="panel-heading font-size-heading"><span data-i18n data-zh="字体大小" data-en="Font size">字体大小</span><span class="heading-hint">Aa</span></div>
+          <div class="panel-heading font-size-heading">
+            <span data-i18n data-zh="字体大小" data-en="Font size">字体大小</span>
+            <span class="heading-actions">
+              <span class="heading-hint">Aa</span>
+              <button id="langBtn" class="mini-text-btn" data-i18n data-zh="English" data-en="中文" data-zh-title="切换到英文界面" data-en-title="Switch to Chinese" title="切换到英文界面">English</button>
+            </span>
+          </div>
           <div class="segmented" id="fontSizeControl">
             <button data-font-scale="1" title="字体 100%" data-zh-title="字体 100%" data-en-title="Font 100%" data-i18n data-zh="小" data-en="S">小</button>
             <button data-font-scale="1.15" class="is-active" title="字体 115%" data-zh-title="字体 115%" data-en-title="Font 115%" data-i18n data-zh="标准" data-en="M">标准</button>

@@ -123,7 +123,8 @@ Inspired by Boss Keys-style lock-and-key analysis, the third view arranges the r
 
 ### 8. Chinese / English Interface
 
-- The **EN / 中文** button next to the Layers heading switches the interface language
+- The **English / 中文** button next to the Font Size heading switches the interface language
+- Chinese UI shows **English**; English UI shows **中文**
 - Covers static chrome, inspector, progress panel, design guide, help, palette, presets, quick jump and lock-tree Canvas labels
 - The language persists in localStorage across reloads
 - Preset room / item / region names are **project data** and keep the language they were authored in
