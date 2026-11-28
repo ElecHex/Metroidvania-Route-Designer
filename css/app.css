@@ -257,6 +257,8 @@ a:hover { color: var(--white); border-color: var(--line-3); }
 }
 .segmented button:hover { color: var(--ink); border-color: var(--line-2); }
 .segmented button.is-active { background: var(--white); color: #0a0a0b; border-color: var(--white); font-weight: 600; }
+#itemKindSeg { grid-template-columns: repeat(3, 1fr); }
+#itemKindSeg button { height: 24px; }
 
 .region-list { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; min-height: 0; padding-right: 2px; }
 .region-row {

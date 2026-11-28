@@ -161,7 +161,7 @@
     if (typeof savedUI.treeMainOnly === 'boolean') app.treeMainOnly = savedUI.treeMainOnly;
     if (savedUI.colorMode === 'mono' || savedUI.colorMode === 'color') app.colorMode = savedUI.colorMode;
     if (['inspect', 'progress', 'guide'].includes(savedUI.rightTab)) app.rightTab = savedUI.rightTab;
-    if (['ability', 'key', 'upgrade', 'boss'].includes(savedUI.itemKind)) app.itemKind = savedUI.itemKind;
+    if (['ability', 'key', 'upgrade', 'boss', 'custom', 'collectible'].includes(savedUI.itemKind)) app.itemKind = savedUI.itemKind;
     if (['select', 'room', 'connect', 'item', 'pan'].includes(savedUI.tool)) app.tool = savedUI.tool;
 
     let project = MV.loadProject();
@@ -813,9 +813,13 @@
           </select></label>
           ${numberField(L('钥匙数', 'Keys'), 'keyReq', link.keyReq, 1, 0)}
         </div>
-        <p class="hint-line">${esc(gate.desc)} ${L('修改门锁类型会重置下方能力需求；之后可继续自定义勾选。', 'Changing the gate type resets the ability requirements below; you can then customize them.')}</p>
+        <p class="hint-line">${esc(gate.desc)} ${L('选择「自定义能力锁」后可勾选任意能力；也可在下方新建能力并自动勾选。', 'Choose “Custom Ability Lock” to tick any ability, or create a new ability below and it will be checked automatically.')}</p>
         <div class="section-label">${L('能力需求', 'Ability Requirements')}</div>
         ${app.project.abilities.length ? `<div class="check-grid">${app.project.abilities.map(ability => `<label class="check-field"><input type="checkbox" data-field="requires" data-ability="${esc(ability.id)}" ${link.requires.includes(ability.id) ? 'checked' : ''}><span>${esc(MV.abilityName(app.project, ability.id))}</span></label>`).join('')}</div>` : `<p class="hint-line">${L('项目能力表为空，请先在项目检查器中添加能力。', 'The project ability list is empty. Add abilities in the project inspector first.')}</p>`}
+        <div class="inline-form ability-quick">
+          <input data-quick-ability placeholder="${L('新建能力并勾选，例如：二段跳', 'Create and check an ability, e.g. Double Jump')}" maxlength="24">
+          <button data-action="quick-ability" data-target="link" title="${L('新建并勾选能力', 'Create and check ability')}">+</button>
+        </div>
         ${missingAbilities.length ? `<div class="req-list">${missingAbilities.map(id => `<span class="req-chip missing">${L('缺失', 'Missing')}: ${esc(id)}</span>`).join('')}</div>` : ''}
         <div class="section-label">${L('状态', 'Status')}</div>
         <div class="req-list">
@@ -849,15 +853,24 @@
           <label class="field"><span>${L('类别', 'Kind')}</span><select data-field="kind">${MV.ITEM_KINDS.map(k => `<option value="${k.id}" ${k.id === item.kind ? 'selected' : ''}>${k.name}</option>`).join('')}</select></label>
           <label class="field"><span>${L('所在房间', 'Room')}</span><select data-field="room">${app.project.rooms.map(r => `<option value="${esc(r.id)}" ${r.id === item.room ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select></label>
         </div>
+        ${item.kind !== 'collectible' ? `
         <label class="field"><span>${L('授予能力', 'Grants Ability')}</span><select data-field="grants">
           <option value="">${L('不授予', 'None')}</option>
           ${app.project.abilities.map(a => `<option value="${esc(a.id)}" ${a.id === item.grants ? 'selected' : ''}>${esc(MV.abilityName(app.project, a.id))} · ${esc(a.id)}</option>`).join('')}
         </select></label>
+        <div class="inline-form ability-quick">
+          <input data-quick-ability placeholder="${L('新建能力并授予，例如：二段跳', 'Create and grant an ability, e.g. Double Jump')}" maxlength="24">
+          <button data-action="quick-ability" data-target="item" title="${L('新建并授予能力', 'Create and grant ability')}">+</button>
+        </div>` : ''}
         ${item.kind === 'key' ? `<div class="form-grid two">${numberField(L('钥匙数量', 'Key Count'), 'keyCount', item.keyCount, 1, 1)}<div></div></div>` : ''}
-        <label class="check-field"><input type="checkbox" data-field="optional" ${item.optional ? 'checked' : ''}><span>${L('可选内容（不参与主线判定）', 'Optional (ignored by the main path)')}</span></label>
+        ${item.kind === 'collectible'
+          ? ''
+          : `<label class="check-field"><input type="checkbox" data-field="optional" ${item.optional ? 'checked' : ''}><span>${L('可选内容（不参与主线判定）', 'Optional (ignored by the main path)')}</span></label>`}
         <label class="field"><span>${L('备注', 'Note')}</span><textarea data-field="note" rows="2">${esc(item.note)}</textarea></label>
       </div>
-      <p class="hint-line">${L('授予能力：拾取后立即加入能力集合。用于能力道具、Boss 旗标或唯一钥匙。钥匙数量：会计入全局钥匙预算。', 'Grants ability: adds the ability as soon as the item is collected. Use it for ability items, boss flags or unique keys. Key count: contributes to the global key budget.')}</p>
+      <p class="hint-line">${item.kind === 'collectible'
+        ? L('收集品只作为“这里有东西”的地图提示，不会成为门锁需求。', 'Collectibles only mark “something is here” on the map and never become gate requirements.')
+        : L('授予能力：拾取后立即加入能力集合。自定义道具也可授予新建能力；新建能力会进入项目能力表，可用于任意自定义能力锁。', 'Grants ability: adds the ability as soon as the item is collected. Custom items can grant a newly created ability, which is added to the project list and can be used by any custom ability lock.')}</p>
       <div class="btn-row">
         <button class="btn" data-action="focus">${L('定位物品', 'Focus Item')}</button>
         <button class="btn btn-danger" data-action="delete-item">${L('删除物品', 'Delete Item')}</button>
@@ -910,7 +923,7 @@
         <div class="stat-cell"><div class="s-label">REACHABLE</div><div class="s-value">${app.analysis.stats.reachableRooms}<span style="font-size:calc(11px * var(--font-scale));color:var(--ink-4)"> / ${counts.rooms}</span></div><div class="s-sub">${L('从起点可达的房间', 'Rooms reachable from start')}</div></div>
         <div class="stat-cell"><div class="s-label">KEYS</div><div class="s-value">${app.analysis.keys}<span style="font-size:calc(11px * var(--font-scale));color:var(--ink-4)"> / ${app.analysis.keysTotal}</span></div><div class="s-sub">${L('已收集 / 全图钥匙', 'Collected / total keys')}</div></div>
         <div class="stat-cell"><div class="s-label">GATES</div><div class="s-value">${app.analysis.openCount}<span style="font-size:calc(11px * var(--font-scale));color:var(--ink-4)"> / ${counts.links}</span></div><div class="s-sub">${L('可通行 / 全部门锁', 'Passable / total gates')}</div></div>
-        <div class="stat-cell"><div class="s-label">ITEMS</div><div class="s-value">${counts.items}</div><div class="s-sub">${counts.optional} ${L('个可选', 'optional')} / ${counts.bosses} ${L('个 Boss', 'bosses')}</div></div>
+        <div class="stat-cell"><div class="s-label">ITEMS</div><div class="s-value">${counts.items}</div><div class="s-sub">${Math.max(0, counts.optional - counts.collectibles)} ${L('个可选', 'optional')} / ${counts.bosses} ${L('个 Boss', 'bosses')} / ${counts.collectibles} ${L('个收集品', 'collectibles')}</div></div>
       </div>
       <div class="form-grid">
         <label class="field"><span>${L('项目标题', 'Project Title')}</span><input data-field="title" value="${esc(app.project.meta.title || L('未命名路线', 'Untitled Route'))}"></label>
@@ -1071,7 +1084,8 @@
       if (field === 'name') { item.name = value || L('未命名物品', 'Untitled Item'); return true; }
       if (field === 'kind') {
         item.kind = value;
-        if (value === 'upgrade') item.optional = true;
+        if (value === 'upgrade' || value === 'collectible') item.optional = true;
+        if (value === 'collectible') item.grants = '';
         if (value !== 'key') item.keyCount = 1;
         return true;
       }
@@ -1122,6 +1136,7 @@
     else if (action === 'focus-region') focusRegion(app.selection.id);
     else if (action === 'delete-ability') deleteAbility(actionBtn.dataset.ability);
     else if (action === 'add-ability') addAbility();
+    else if (action === 'quick-ability') addQuickAbility(actionBtn);
     else if (action === 'open-presets') openPresetModal();
   }
 
@@ -1843,6 +1858,11 @@
       optional = true;
     } else if (kind === 'boss') {
       name = L('Boss ', 'Boss ') + (app.project.items.filter(item => item.kind === 'boss').length + 1);
+    } else if (kind === 'custom') {
+      name = L('自定义道具 ', 'Custom Item ') + (app.project.items.filter(item => item.kind === 'custom').length + 1);
+    } else if (kind === 'collectible') {
+      name = L('收集品 ', 'Collectible ') + (app.project.items.filter(item => item.kind === 'collectible').length + 1);
+      optional = true;
     }
     const item = {
       id: MV.uid('item'),
@@ -1912,6 +1932,37 @@
     toast(L('能力已删除', 'Ability deleted'));
   }
 
+  function addQuickAbility(button) {
+    const form = button ? button.closest('.ability-quick') : null;
+    const input = form ? form.querySelector('input') : null;
+    const name = input ? input.value.trim() : '';
+    if (!name) { toast(L('请输入能力名称', 'Enter an ability name'), true); return; }
+    snapshot();
+    let id = MV.uid('ability');
+    while (app.project.abilities.some(ability => ability.id === id)) id = MV.uid('ability');
+    app.project.abilities.push({ id, name });
+    let suffix = '';
+    if (app.selection) {
+      if (app.selection.type === 'item') {
+        const item = MV.findItem(app.project, app.selection.id);
+        if (item && item.kind !== 'collectible') {
+          item.grants = id;
+          suffix = L('（已授予）', ' (granted)');
+        }
+      } else if (app.selection.type === 'link') {
+        const link = MV.findLink(app.project, app.selection.id);
+        if (link) {
+          link.requires = Array.from(new Set([...(link.requires || []), id]));
+          suffix = L('（已勾选）', ' (checked)');
+        }
+      }
+    }
+    app.analysis = MV.analyze(app.project);
+    markDirty();
+    refreshAll();
+    toast(L('已新建能力：', 'Ability created: ') + name + suffix);
+  }
+
   /* ============================================================
      tools / modes / camera
      ============================================================ */
@@ -1950,7 +2001,7 @@
     } else {
       els.connectHint.hidden = true;
     }
-    const kindLabel = app.itemKind === 'ability' ? L('能力', 'Ability') : app.itemKind === 'key' ? L('钥匙', 'Key') : app.itemKind === 'upgrade' ? L('强化', 'Upgrade') : 'Boss';
+    const kindLabel = MV.itemKindById(app.itemKind).name;
     els.itemKindSeg.title = L('当前放置：', 'Placing: ') + kindLabel;
     updateCursor();
   }
@@ -3139,6 +3190,8 @@
           <p class="about-copy">The project autosaves to browser localStorage, and unsaved changes are flushed when the page is hidden or closed. The save button writes immediately; exporting JSON is the reliable long-term backup. Import backs up the current project to <span class="mono">routeforge.backup.v1</span>. PNG export re-lays out the entire 2D route independently of the current zoom.</p>
           <div class="section-label">Preset Notes</div>
           <p class="about-copy">The <strong>Metroid Prime</strong> preset is a <strong>structured reference</strong> assembled from public sources. It keeps the region ring, Magmoor hub, beam-gate matrix, Morph Ball spatial locks, visor locks, environmental gates and the 12-artifact endgame, but does not guarantee official room coordinates or item placements. Other presets are compressed structural references.</p>
+          <div class="section-label">Custom Items & Collectibles</div>
+          <p class="about-copy">Use the Custom item kind for project-specific pickups: name them, grant an existing or newly created ability, and that ability becomes available in every gate's Ability Requirements. The + field under Grants Ability / Ability Requirements creates a new project ability and immediately grants or checks it. Collectibles are map hints only: they do not grant abilities, count as keys, or enter the lock timeline.</p>
           <div class="section-label">Design Principle</div>
           <p class="about-copy">First draw “what the player must acquire,” then draw “how those abilities change spatial traversal.” The 2D view owns the causal chain; the 3D view owns massing and vertical relationships. The progress panel uses reachability analysis to check deadlocks, key budgets and unreachable rooms.</p>
         </div>
@@ -3190,6 +3243,8 @@
         <p class="about-copy">项目自动保存在浏览器 localStorage。顶栏的保存按钮会立即写入；导出 JSON 是长期备份的可靠方式。导入时会先备份当前项目到 <span class="mono">routeforge.backup.v1</span>。PNG 导出会重新排版整张 2D 路线图，不依赖当前缩放。</p>
         <div class="section-label">预设说明</div>
         <p class="about-copy"><strong>密特罗德 Prime</strong> 预设是基于公开资料的<strong>结构化复刻</strong>，保留了区域环、Magmoor 中枢、光束门矩阵、变形球空间锁、视镜锁、环境门槛与 12 神器终局，但不保证每个房间的坐标与道具位置与官方完全一致。其余预设为压缩后的结构参考。</p>
+        <div class="section-label">自定义道具与收集品</div>
+        <p class="about-copy">“自定义”道具用于创建项目专属拾取物：可自由命名、授予已有或新建能力，该能力会出现在所有门锁的“能力需求”中。物品检查器的“授予能力”下方、连接检查器的“能力需求”下方都有 + 输入框，可新建能力并立即授予 / 勾选。“收集品”只作为地图提示，不授予能力、不计钥匙、不进入锁钥时间轴。</p>
         <div class="section-label">设计原则</div>
         <p class="about-copy">先画出“玩家必须获得什么”，再画出“这些能力如何改变空间通行”。2D 视图负责因果链，3D 视图负责空间体块与垂直关系；进度面板用可达性分析检查锁死、钥匙预算与不可达房间。</p>
       </div>

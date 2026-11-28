@@ -23,7 +23,9 @@ Internal codename: **ROUTE FORGE**. Pure frontend, zero dependencies: open `inde
 - Drag to draw rooms, drag to move, drag a corner to resize
 - Room types: normal, start, hub, boss, save, elevator, hazard, goal
 - Region grouping and region colors
-- Place abilities, keys / artifacts, optional upgrades, bosses / events inside rooms
+- Place abilities, keys / artifacts, optional upgrades, bosses / events, custom items and collectibles inside rooms
+- Custom items can grant an existing or newly created ability. Both the item inspector and the link inspector can create a new ability and immediately grant / check it; the new ability can be used by any “Custom Ability Lock”
+- Collectibles are map hints only: they do not grant abilities, count as keys, or enter the lock timeline
 - Connect two rooms and choose a gate:
   - Beam gates (Ice / Wave / Plasma), Missile Door
   - Morph Ball tunnel, Bomb Slot, Boost Ball half-pipe, Spider Ball track

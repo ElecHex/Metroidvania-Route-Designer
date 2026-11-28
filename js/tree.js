@@ -48,7 +48,12 @@
     }
 
     const items = (project.items || []).filter(item => reachable.has(item.room));
-    const includedItems = items.filter(item => item.kind !== 'key' || !!item.grants);
+    const includedItems = items.filter(item => {
+      if (item.kind === 'collectible') return false;
+      if (item.kind === 'custom' && !item.grants) return false;
+      return item.kind !== 'key' || !!item.grants;
+    });
+    const collectibles = items.filter(item => item.kind === 'collectible');
     const unpickedKeys = items.filter(item => item.kind === 'key' && !item.grants);
 
     const itemStep = {};
@@ -221,6 +226,7 @@
         keys: unpickedKeys.length,
         optional: includedItems.filter(item => item.optional).length,
         unreachableItems: (project.items || []).filter(item => !reachable.has(item.room)).length,
+        collectibles: collectibles.length,
         cycles: 0
       }
     };

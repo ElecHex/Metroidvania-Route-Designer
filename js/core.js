@@ -69,7 +69,9 @@
     { id: 'ability', name: '能力道具', nameEn: 'Ability Item', code: 'ABILITY', short: 'AB', color: '#64b5f6' },
     { id: 'key', name: '钥匙 / 神器', nameEn: 'Key / Artifact', code: 'KEY', short: 'KY', color: '#ffd54f' },
     { id: 'upgrade', name: '可选强化', nameEn: 'Optional Upgrade', code: 'UPGRADE', short: 'UP', color: '#4db6ac' },
-    { id: 'boss', name: 'Boss / 事件', nameEn: 'Boss / Event', code: 'BOSS', short: 'BS', color: '#ef5350' }
+    { id: 'boss', name: 'Boss / 事件', nameEn: 'Boss / Event', code: 'BOSS', short: 'BS', color: '#ef5350' },
+    { id: 'custom', name: '自定义道具', nameEn: 'Custom Item', code: 'CUS', short: 'CU', color: '#c7a6ff' },
+    { id: 'collectible', name: '收集品', nameEn: 'Collectible', code: 'COL', short: 'CO', color: '#f472b6' }
   ];
 
   function localizeCatalogEntry(entry, property, enProperty) {
@@ -480,6 +482,7 @@
       abilities: (project.abilities || []).length,
       keys: items.filter(i => i.kind === 'key').reduce((sum, i) => sum + (Number(i.keyCount) || 1), 0),
       bosses: items.filter(i => i.kind === 'boss').length,
+      collectibles: items.filter(i => i.kind === 'collectible').length,
       optional: items.filter(i => i.optional).length
     };
   }
@@ -641,14 +644,15 @@
       .filter(i => i && i.id && roomIds.has(String(i.room)))
       .map(i => {
         const kind = itemKindById(i.kind);
+        const collectible = kind.id === 'collectible';
         return {
           id: String(i.id),
           name: String(i.name || L('未命名物品', 'Untitled Item')),
           kind: kind.id,
           room: String(i.room),
-          grants: i.grants && project.abilities.some(a => a.id === i.grants) ? String(i.grants) : '',
+          grants: collectible ? '' : (i.grants && project.abilities.some(a => a.id === i.grants) ? String(i.grants) : ''),
           keyCount: Math.max(1, Number(i.keyCount) || 1),
-          optional: !!i.optional,
+          optional: collectible ? true : !!i.optional,
           note: String(i.note || '')
         };
       });

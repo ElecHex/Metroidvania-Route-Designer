@@ -128,6 +128,10 @@
         (itemsByRoom[roomId] || []).forEach(item => {
           if (collected.has(item.id)) return;
           collected.add(item.id);
+          /* Collectibles and custom flavour items are map hints only: they are
+             counted as collected but do not advance the progression timeline. */
+          const hintOnly = item.kind === 'collectible' || (item.kind === 'custom' && !item.grants);
+          if (hintOnly) return;
           let gained = '';
           if (item.grants) {
             gained = item.grants;
@@ -293,7 +297,9 @@
     });
 
     if (unreachableRooms.length) {
-      const withItems = items.filter(item => !finalReachable.has(item.room));
+      const withItems = items.filter(item => !finalReachable.has(item.room) &&
+        item.kind !== 'collectible' &&
+        !(item.kind === 'custom' && !item.grants));
       addWarning(
         withItems.length ? 'warn' : 'info',
         'unreachable-rooms',
@@ -347,6 +353,8 @@
         reachableRooms: finalReachable.size,
         items: items.length,
         collectedItems: collected.size,
+        collectibles: items.filter(item => item.kind === 'collectible').length,
+        collectedCollectibles: items.filter(item => item.kind === 'collectible' && collected.has(item.id)).length,
         abilities: (project.abilities || []).length,
         acquiredAbilities: abilities.size,
         keys: keys,
